@@ -52,8 +52,8 @@ class Hub {
           const vid = msg && msg.vehicleId;
           if (!msg || !vid || !/^\d+$/.test(String(vid))) return;
           if (!(await canSeeVehicle(user, +vid))) return; // no relaxing access on rt channel
-          if (msg.type === 'subscribe') client.subs.add(+vid);
-          else if (msg.type === 'unsubscribe') client.subs.delete(+vid);
+          if (msg.type === 'subscribe') client.subs.add(String(vid));
+          else if (msg.type === 'unsubscribe') client.subs.delete(String(vid));
         });
       }
 
@@ -63,8 +63,9 @@ class Hub {
 
   publish(vehicleId, payload) {
     const data = JSON.stringify(payload);
+    const key = String(vehicleId);
     for (const c of this.sockets) {
-      if (c.subs.has(vehicleId)) {
+      if (c.subs.has(key)) {
         try { c.ws.send(data); } catch { /* socket dead, cleaned up on close */ }
       }
     }

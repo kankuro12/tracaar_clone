@@ -19,25 +19,26 @@ async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, dev
 }
 
 // Which vehicle ids may `user` see. role super_admin -> everything.
-// NOTE: pg returns BIGINT columns as strings — coerce to Number so Set.has(vehicleId) works.
+// NOTE: pg returns BIGINT columns as strings and INT4 as numbers — normalize to
+// String so Set.has() matches what ingest passes (hub.publish keys by vehicle.id).
 async function visibleVehicleIds(user) {
   if (user.role === 'super_admin') {
     const r = await pool.query('SELECT id FROM vehicles');
-    return new Set(r.rows.map((x) => Number(x.id)));
+    return new Set(r.rows.map((x) => String(x.id)));
   }
   if (user.role === 'admin') {
     const r = await pool.query('SELECT id FROM vehicles WHERE customer_id = $1', [user.customerId]);
-    return new Set(r.rows.map((x) => Number(x.id)));
+    return new Set(r.rows.map((x) => String(x.id)));
   }
   const r = await pool.query(
     `SELECT vehicle_id FROM vehicle_user WHERE user_id = $1`,
     [user.id]
   );
-  return new Set(r.rows.map((x) => Number(x.vehicle_id)));
+  return new Set(r.rows.map((x) => String(x.vehicle_id)));
 }
 
 async function canSeeVehicle(user, vehicleId) {
-  return (await visibleVehicleIds(user)).has(vehicleId);
+  return (await visibleVehicleIds(user)).has(String(vehicleId));
 }
 
 // One row per visible vehicle incl. latest position (null when never reported).
