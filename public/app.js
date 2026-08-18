@@ -44,8 +44,8 @@ const isOnline = (v) => v.position && Date.now() - new Date(v.position.recordedA
 function markerIcon(v, selected) {
   const cls = selected ? 'selected' : isOnline(v) ? 'online' : 'offline';
   const inner = isOnline(v) ? '<span class="pulse"></span>' : '';
-  const arrow = v.position && v.position.course != null
-    ? `<span class="arrow" style="transform: rotate(${v.position.course}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>` : '';
+  const arrow = v.position && (v.position.course != null || anim.has(v.id))
+    ? `<span class="arrow" style="transform: rotate(${(anim.get(v.id)?.headingDeg ?? v.position.course) ?? 0}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>` : '';
   return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${arrow}${inner}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
 }
 
@@ -107,7 +107,7 @@ function applySelection() {
     else fitTo(new Set(state.vehicles.keys()));
   }
   for (const v of state.vehicles.values()) {
-    state.markers.get(v.id).setIcon(markerIcon(v, state.selected.has(v.id)));
+    setMarkerIcon(v.id);
   }
   renderSidebar();
 }
@@ -160,7 +160,7 @@ function upsertVehicle(v, selectable) {
   }
   if (v.position) {
     m.setLatLng([v.position.lat, v.position.lon]);
-    m.setIcon(markerIcon(v, state.selected.has(v.id)));
+    setMarkerIcon(v.id);
     m.bindPopup(popupHtml(v));
   }
   if (!existing && selectable) renderSidebar();
@@ -227,6 +227,113 @@ async function loadAlerts() {
   for (const a of alerts.slice(-5)) showAlert(a);
 }
 
+/* ---------- motion: correction tween + dead reckoning ---------- */
+// Decouples rendering from fix arrival: ws handler only feeds state via onFix();
+// a rAF loop applies the marker position every frame.
+const MOTION = {
+  correctionMs: 800,   // ease-out tween to each confirmed fix (~25% of typical 5s fix interval)
+  anomalyMs: 3000,     // slower tween when a fix implies implausible speed (GPS glitch, not motion)
+  maxKmh: 300,         // implied-speed threshold for anomaly detection
+  staleMs: ONLINE_MS,  // stop dead reckoning after this silence; marker freezes, refresh grays it out
+};
+
+const anim = new Map();   // id -> { pos, last, tween, heading, headingDeg, prevFix }
+const arrows = new Map(); // id -> .arrow element (invalidated on every setIcon)
+
+const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
+const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+function setMarkerIcon(id) {
+  arrows.delete(id);
+  state.markers.get(id).setIcon(markerIcon(state.vehicles.get(id), state.selected.has(id)));
+}
+
+function setRotation(id, deg) {
+  let el = arrows.get(id);
+  if (!el) {
+    const m = state.markers.get(id);
+    el = m && m._icon && m._icon.querySelector('.arrow');
+    if (!el) return;
+    arrows.set(id, el);
+  }
+  el.style.transform = `rotate(${deg}deg)`;
+}
+
+function deadReckon(last, ms) {
+  // equirectangular projection, fine for sub-km extrapolation — ponytail: great-circle if longer hauls
+  const d = ((last.speedKn * 1.852) / 3.6) * (ms / 1000);
+  const φ = (last.lat * Math.PI) / 180;
+  const lat = last.lat + (d * Math.cos((last.course * Math.PI) / 180)) / 111_320;
+  const lon = last.lon + (d * Math.sin((last.course * Math.PI) / 180)) / (111_320 * Math.cos(φ));
+  return [lat, lon];
+}
+
+function bearingDeg(from, to) {
+  const φ1 = (from[0] * Math.PI) / 180, φ2 = (to[0] * Math.PI) / 180;
+  const Δλ = ((to[1] - from[1]) * Math.PI) / 180;
+  return ((Math.atan2(Math.sin(Δλ) * Math.cos(φ2), Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ)) * 180) / Math.PI + 360) % 360;
+}
+
+function onFix(v, p) {
+  let a = anim.get(v.id);
+  const now = Date.now();
+  if (!a) {
+    a = { pos: [p.lat, p.lon], last: null, prevFix: null, tween: null, heading: null, headingDeg: p.course || 0 };
+    anim.set(v.id, a);
+  }
+  const to = [p.lat, p.lon];
+  const fixTime = p.recordedAt ? new Date(p.recordedAt).getTime() : now;
+  const dt = a.last ? (fixTime - a.last.time) / 1000 : 0;
+  const impliedKmh = dt > 0 ? (haversineKm(a.pos, to) / dt) * 3600 : 0;
+  const anomalous = impliedKmh > MOTION.maxKmh;
+  a.tween = { from: a.pos.slice(), to, start: now, dur: anomalous ? MOTION.anomalyMs : MOTION.correctionMs };
+  const targetHeading = p.course != null ? p.course : a.prevFix ? bearingDeg(a.prevFix, to) : a.headingDeg;
+  a.heading = { from: a.headingDeg, to: targetHeading, start: now, dur: MOTION.correctionMs };
+  a.prevFix = to;
+  a.last = { time: fixTime, lat: p.lat, lon: p.lon, speedKn: p.speedKn || 0, course: targetHeading };
+}
+
+function tickMotion() {
+  const now = Date.now();
+  for (const [id, a] of anim) {
+    const m = state.markers.get(id);
+    if (!m) continue;
+    if (a.tween) {
+      const t = Math.min(1, (now - a.tween.start) / a.tween.dur);
+      const k = easeOut(t);
+      a.pos = [
+        a.tween.from[0] + (a.tween.to[0] - a.tween.from[0]) * k,
+        a.tween.from[1] + (a.tween.to[1] - a.tween.from[1]) * k,
+      ];
+      if (t >= 1) { a.pos = a.tween.to; a.tween = null; }
+    } else if (a.last && a.last.speedKn > 0 && now - a.last.time < MOTION.staleMs) {
+      a.pos = deadReckon(a.last, now - a.last.time);
+    }
+    m.setLatLng(a.pos);
+    if (state.selected.size === 1 && state.selected.has(id)) map.panTo(a.pos, { animate: false });
+    if (a.heading) {
+      const t = Math.min(1, (now - a.heading.start) / a.heading.dur);
+      a.headingDeg = (a.heading.from + shortestAngle(a.heading.from, a.heading.to) * easeOut(t) + 360) % 360;
+      if (t >= 1) a.heading = null;
+    }
+    setRotation(id, a.headingDeg);
+  }
+}
+
+function motionLoop() {
+  requestAnimationFrame(motionLoop);
+  if (!document.hidden) tickMotion(); // rAF is already throttled when hidden; this is belt & braces
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) return;
+  // resume from confirmed fixes, not from a stale mid-flight tween
+  for (const a of anim.values()) {
+    if (a.tween) { a.pos = a.tween.to; a.tween = null; }
+    if (a.heading) { a.headingDeg = a.heading.to; a.heading = null; }
+  }
+});
+
 /* ---------- realtime ---------- */
 function connectWs() {
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -252,16 +359,13 @@ function connectWs() {
     const v = state.vehicles.get(msg.vehicleId);
     if (!v) return;
     v.position = msg.position;
+    onFix(v, msg.position); // feeds the render loop; never sets the marker directly
     const m = state.markers.get(v.id);
-    m.setLatLng([msg.position.lat, msg.position.lon]);
-    m.setIcon(markerIcon(v, state.selected.has(v.id)));
+    setMarkerIcon(v.id);
     m.setPopupContent(popupHtml(v));
-    if (state.selected.has(v.id)) {
-      if (state.selected.size === 1) {
-        if (state.trail) state.trail.addLatLng([msg.position.lat, msg.position.lon]);
-        else drawTrail(v.id);
-      }
-      map.panTo([msg.position.lat, msg.position.lon]);
+    if (state.selected.has(v.id) && state.selected.size === 1) {
+      if (state.trail) state.trail.addLatLng([msg.position.lat, msg.position.lon]);
+      else drawTrail(v.id);
     }
     renderSidebar();
   };
@@ -283,6 +387,7 @@ async function boot() {
     document.getElementById('map-loading').style.display = 'none';
     if (vehicles.some((v) => v.position)) fitTo(new Set(vehicles.map((v) => v.id)));
     connectWs();
+    motionLoop();
     setInterval(() => {
       for (const v of state.vehicles.values()) {
         state.markers.get(v.id)?.setIcon(markerIcon(v, state.selected.has(v.id)));
