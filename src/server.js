@@ -35,10 +35,8 @@ app.use(session({
 app.use('/api', routes);
 app.use(web);
 app.use(express.static(path.join(__dirname, '..', 'public')));
-// leaflet served from node_modules so the dashboard needs no CDN
+// leaflet served from node_modules so the map needs no CDN (bootstrap/jquery come from CDN)
 app.use('/vendor/leaflet', express.static(path.join(__dirname, '..', 'node_modules', 'leaflet', 'dist')));
-app.use('/vendor/bootstrap', express.static(path.join(__dirname, '..', 'node_modules', 'bootstrap', 'dist')));
-app.use('/vendor/jquery', express.static(path.join(__dirname, '..', 'node_modules', 'jquery', 'dist')));
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, next) => {
   console.error(err);

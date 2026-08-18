@@ -1,104 +1,112 @@
 <%- include('partials/head', { title: customer.name }) %>
   <%- include('partials/topbar') %>
-  <div class="admin-layout">
+  <div class="d-flex">
     <%- include('partials/nav', { active: 'customers' }) %>
-    <main class="admin-main">
-      <a class="btn small" href="/admin/customers">← All customers</a>
-      <h1><%= customer.name %></h1>
-      <div class="two-col">
-        <div>
-          <h2 class="section-title">Vehicles</h2>
-          <form class="card-form" id="reg-vehicle">
-            <label>Name <input name="name" required></label>
-            <label>IMEI <input name="imei" class="mono" required></label>
-            <label>Plate <input name="plate"></label>
-            <button class="btn" type="submit">Assign IMEI / register</button>
-            <div class="form-error" hidden></div>
-          </form>
-          <table class="tbl">
-            <thead><tr><th>ID</th><th>Name</th><th>IMEI</th><th>Plate</th><th>Last report</th><th></th></tr></thead>
-            <tbody>
-              <% if (!vehicles.length) { %><tr><td colspan="6">No vehicles yet — register an IMEI to start tracking.</td></tr><% } %>
-              <% vehicles.forEach((v) => { %>
-              <tr>
-                <td class="mono"><%= v.id %></td>
-                <td><%= v.name %></td>
-                <td class="mono"><%= v.imei %></td>
-                <td class="mono"><%= v.plate || '—' %></td>
-                <td class="mono"><%= fmtDT(v.last_reported) %></td>
-                <td><button class="btn small danger" data-del-vehicle="<%= v.id %>">Delete</button></td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <a class="btn btn-sm btn-outline-dark mb-2" href="/admin/customers">← All customers</a>
+      <h1 class="h4 mb-4"><%= customer.name %></h1>
+      <div class="row g-4">
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 text-uppercase text-body-secondary">Vehicles</h2>
+              <form id="reg-vehicle" class="row g-2 mb-3">
+                <div class="col-6"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
+                <div class="col-6"><label class="form-label">IMEI</label><input class="form-control font-monospace" name="imei" required></div>
+                <div class="col-6"><label class="form-label">Plate</label><input class="form-control" name="plate"></div>
+                <div class="col-12"><button class="btn btn-dark btn-sm" type="submit">Assign IMEI / register</button></div>
+              </form>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>ID</th><th>Name</th><th>IMEI</th><th>Plate</th><th>Last report</th><th></th></tr></thead>
+                  <tbody>
+                    <% if (!vehicles.length) { %><tr><td colspan="6" class="text-body-secondary">No vehicles yet — register an IMEI to start tracking.</td></tr><% } %>
+                    <% vehicles.forEach((v) => { %>
+                    <tr>
+                      <td class="font-monospace small"><%= v.id %></td>
+                      <td><%= v.name %></td>
+                      <td class="font-monospace small"><%= v.imei %></td>
+                      <td class="font-monospace small"><%= v.plate || '—' %></td>
+                      <td class="font-monospace small"><%= fmtDT(v.last_reported) %></td>
+                      <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del-vehicle="<%= v.id %>">Delete</button></td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
-        <div>
-          <h2 class="section-title">Users</h2>
-          <form class="card-form" id="create-tenant-user">
-            <label>Name <input name="name" required></label>
-            <label>Email <input name="email" type="email" required></label>
-            <label>Password <input name="password" type="password" required></label>
-            <label>Role
-              <select name="role"><option value="user">user</option><option value="admin">admin</option></select>
-            </label>
-            <button class="btn" type="submit">Create user</button>
-            <div class="form-error" hidden></div>
-          </form>
-          <table class="tbl">
-            <thead><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-            <tbody>
-              <% users.forEach((u) => { %>
-              <tr>
-                <td class="mono"><%= u.id %></td>
-                <td><%= u.name %></td>
-                <td class="mono"><%= u.email %></td>
-                <td><%= u.role %></td>
-                <td>
-                  <button class="btn small" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset password</button>
-                  <button class="btn small danger" data-del-user="<%= u.id %>">Delete</button>
-                </td>
-              </tr>
-              <% }) %>
-            </tbody>
-          </table>
+        <div class="col-lg-6">
+          <div class="card">
+            <div class="card-body">
+              <h2 class="h6 text-uppercase text-body-secondary">Users</h2>
+              <form id="create-tenant-user" class="row g-2 mb-3">
+                <div class="col-6"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
+                <div class="col-6"><label class="form-label">Email</label><input class="form-control" name="email" type="email" required></div>
+                <div class="col-6"><label class="form-label">Password</label><input class="form-control" name="password" type="password" required></div>
+                <div class="col-6">
+                  <label class="form-label">Role</label>
+                  <select class="form-select" name="role"><option value="user">user</option><option value="admin">admin</option></select>
+                </div>
+                <div class="col-12"><button class="btn btn-dark btn-sm" type="submit">Create user</button></div>
+              </form>
+              <div class="table-responsive">
+                <table class="table table-sm table-hover align-middle mb-0">
+                  <thead class="table-light"><tr><th>ID</th><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
+                  <tbody>
+                    <% users.forEach((u) => { %>
+                    <tr>
+                      <td class="font-monospace small"><%= u.id %></td>
+                      <td><%= u.name %></td>
+                      <td class="font-monospace small"><%= u.email %></td>
+                      <td><%= u.role %></td>
+                      <td class="text-end">
+                        <button class="btn btn-sm btn-outline-dark" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset password</button>
+                        <button class="btn btn-sm btn-outline-danger" data-del-user="<%= u.id %>">Delete</button>
+                      </td>
+                    </tr>
+                    <% }) %>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </main>
   </div>
+  <%- include('partials/scripts') %>
   <script>
     const cid = '<%= customer.id %>';
-    document.getElementById('reg-vehicle').addEventListener('submit', async (e) => {
+    $('#reg-vehicle').on('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      try {
-        await api(`/api/customers/${cid}/vehicles`, { method: 'POST', body: JSON.stringify({ name: f.get('name'), imei: f.get('imei'), plate: f.get('plate') }) });
-        location.reload();
-      } catch (err) { showErr(e.target, err.message); }
+      try { await api(`/api/customers/${cid}/vehicles`, { method: 'POST', body: JSON.stringify({ name: f.get('name'), imei: f.get('imei'), plate: f.get('plate') }) }); location.reload(); }
+      catch (err) { showErr(e.target, err.message); }
     });
-    document.getElementById('create-tenant-user').addEventListener('submit', async (e) => {
+    $('#create-tenant-user').on('submit', async (e) => {
       e.preventDefault();
-      const f = new FormData(e.target);
-      try {
-        await api(`/api/customers/${cid}/users`, { method: 'POST', body: JSON.stringify(Object.fromEntries(f)) });
-        location.reload();
-      } catch (err) { showErr(e.target, err.message); }
+      const f = Object.fromEntries(new FormData(e.target).entries());
+      try { await api(`/api/customers/${cid}/users`, { method: 'POST', body: JSON.stringify(f) }); location.reload(); }
+      catch (err) { showErr(e.target, err.message); }
     });
-    document.querySelectorAll('[data-del-vehicle]').forEach((b) => b.addEventListener('click', async () => {
+    $('[data-del-vehicle]').on('click', async function () {
       if (!confirm('Delete this vehicle?')) return;
-      try { await api(`/api/customers/${cid}/vehicles/${b.dataset.delVehicle}`, { method: 'DELETE' }); location.reload(); }
-      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
-    }));
-    document.querySelectorAll('[data-del-user]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/customers/${cid}/vehicles/${this.dataset.delVehicle}`, { method: 'DELETE' }); location.reload(); }
+      catch (err) { showErr('.admin-main', err.message); }
+    });
+    $('[data-del-user]').on('click', async function () {
       if (!confirm('Delete this user?')) return;
-      try { await api(`/api/customers/${cid}/users/${b.dataset.delUser}`, { method: 'DELETE' }); location.reload(); }
-      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
-    }));
-    document.querySelectorAll('[data-pw]').forEach((b) => b.addEventListener('click', async () => {
-      const pw = prompt(`New password for ${b.dataset.name} (min 6 chars):`);
+      try { await api(`/api/customers/${cid}/users/${this.dataset.delUser}`, { method: 'DELETE' }); location.reload(); }
+      catch (err) { showErr('.admin-main', err.message); }
+    });
+    $('[data-pw]').on('click', async function () {
+      const pw = prompt(`New password for ${this.dataset.name} (min 6 chars):`);
       if (!pw) return;
-      try { await api(`/api/customers/${cid}/users/${b.dataset.pw}/password`, { method: 'PATCH', body: JSON.stringify({ password: pw }) }); location.reload(); }
-      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
-    }));
+      try { await api(`/api/customers/${cid}/users/${this.dataset.pw}/password`, { method: 'PATCH', body: JSON.stringify({ password: pw }) }); location.reload(); }
+      catch (err) { showErr('.admin-main', err.message); }
+    });
   </script>
 </body>
 </html>

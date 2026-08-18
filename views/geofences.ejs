@@ -1,45 +1,54 @@
 <%- include('partials/head', { title: 'Geofences' }) %>
   <%- include('partials/topbar') %>
-  <div class="admin-layout">
+  <div class="d-flex">
     <%- include('partials/nav', { active }) %>
-    <main class="admin-main">
-      <h1>Geofences</h1>
-      <form class="card-form" id="create-geofence">
-        <h2>New zone</h2>
-        <label>Name <input name="name" required></label>
-        <label>Latitude <input name="lat" type="number" step="any" required></label>
-        <label>Longitude <input name="lon" type="number" step="any" required></label>
-        <label>Radius (m) <input name="radiusM" type="number" min="1" required></label>
-        <label>Vehicles
-          <select name="vehicleIds" multiple size="4">
-            <% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %>
-          </select>
-        </label>
-        <button class="btn" type="submit">Create geofence</button>
-        <div class="form-error" hidden></div>
-      </form>
-      <table class="tbl">
-        <thead><tr><th>Name</th><th>Center</th><th>Radius</th><th>Vehicles</th></tr></thead>
-        <tbody>
-          <% if (!geofences.length) { %><tr><td colspan="4">No zones yet.</td></tr><% } %>
-          <% geofences.forEach((g) => { %>
-          <tr>
-            <td><%= g.name %></td>
-            <td class="mono"><%= g.lat.toFixed(5) %>, <%= g.lon.toFixed(5) %></td>
-            <td><%= g.radius_m %> m</td>
-            <td>
-              <% g.vehicleIds.map((id) => vehicles.find((v) => v.id === id)).filter(Boolean).forEach((v) => { %>
-                <span class="assign-chip"><%= v.name %></span>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <h1 class="h4 mb-4">Geofences</h1>
+      <div class="card mb-4" style="max-width: 640px">
+        <div class="card-body">
+          <h2 class="h6 text-uppercase text-body-secondary">New zone</h2>
+          <form id="create-geofence" class="row g-3">
+            <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
+            <div class="col-md-3"><label class="form-label">Latitude</label><input class="form-control" name="lat" type="number" step="any" required></div>
+            <div class="col-md-3"><label class="form-label">Longitude</label><input class="form-control" name="lon" type="number" step="any" required></div>
+            <div class="col-md-4"><label class="form-label">Radius (m)</label><input class="form-control" name="radiusM" type="number" min="1" required></div>
+            <div class="col-md-8">
+              <label class="form-label">Vehicles</label>
+              <select class="form-select" name="vehicleIds" multiple size="4">
+                <% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %>
+              </select>
+            </div>
+            <div class="col-12"><button class="btn btn-dark" type="submit">Create geofence</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light"><tr><th>Name</th><th>Center</th><th>Radius</th><th>Vehicles</th></tr></thead>
+            <tbody>
+              <% if (!geofences.length) { %><tr><td colspan="4" class="text-body-secondary">No zones yet.</td></tr><% } %>
+              <% geofences.forEach((g) => { %>
+              <tr>
+                <td class="fw-medium"><%= g.name %></td>
+                <td class="font-monospace small"><%= g.lat.toFixed(5) %>, <%= g.lon.toFixed(5) %></td>
+                <td><%= g.radius_m %> m</td>
+                <td>
+                  <% g.vehicleIds.map((id) => vehicles.find((v) => v.id === id)).filter(Boolean).forEach((v) => { %>
+                    <span class="badge text-bg-light border"><%= v.name %></span>
+                  <% }) %>
+                </td>
+              </tr>
               <% }) %>
-            </td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
   </div>
+  <%- include('partials/scripts') %>
   <script>
-    document.getElementById('create-geofence').addEventListener('submit', async (e) => {
+    $('#create-geofence').on('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
       const vehicleIds = f.getAll('vehicleIds').map(Number);

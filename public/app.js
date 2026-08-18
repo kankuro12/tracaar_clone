@@ -8,9 +8,6 @@ const token = window.FLEET && window.FLEET.token;
 const user = window.FLEET && window.FLEET.user;
 if (!token || !user) location.href = '/login';
 
-document.getElementById('user-name').textContent = user.name;
-document.getElementById('user-role').textContent = user.role.replace('_', ' ');
-
 const map = L.map('map').setView(DEFAULT_CENTER, 13);
 L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 19,

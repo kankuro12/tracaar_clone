@@ -1,47 +1,53 @@
 <%- include('partials/head', { title: 'Users' }) %>
   <%- include('partials/topbar') %>
-  <div class="admin-layout">
+  <div class="d-flex">
     <%- include('partials/nav', { active }) %>
-    <main class="admin-main">
-      <h1>Users</h1>
-      <form class="card-form" id="create-user">
-        <h2>New user</h2>
-        <label>Name <input name="name" required></label>
-        <label>Email <input name="email" type="email" required></label>
-        <label>Password <input name="password" type="password" required></label>
-        <button class="btn" type="submit">Create user</button>
-        <div class="form-error" hidden></div>
-      </form>
-      <table class="tbl">
-        <thead><tr><th>Name</th><th>Email</th><th>Role</th><th></th></tr></thead>
-        <tbody>
-          <% users.forEach((u) => { %>
-          <tr>
-            <td><%= u.name %></td>
-            <td class="mono"><%= u.email %></td>
-            <td><%= u.role %></td>
-            <td><button class="btn small" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset password</button></td>
-          </tr>
-          <% }) %>
-        </tbody>
-      </table>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <h1 class="h4 mb-4">Users</h1>
+      <div class="card mb-4" style="max-width: 520px">
+        <div class="card-body">
+          <h2 class="h6 text-uppercase text-body-secondary">New user</h2>
+          <form id="create-user" class="row g-3">
+            <div class="col-12"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
+            <div class="col-12"><label class="form-label">Email</label><input class="form-control" name="email" type="email" required></div>
+            <div class="col-12"><label class="form-label">Password</label><input class="form-control" name="password" type="password" required></div>
+            <div class="col-12"><button class="btn btn-dark" type="submit">Create user</button></div>
+          </form>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Role</th><th class="text-end"></th></tr></thead>
+            <tbody>
+              <% users.forEach((u) => { %>
+              <tr>
+                <td class="fw-medium"><%= u.name %></td>
+                <td class="font-monospace small"><%= u.email %></td>
+                <td><%= u.role %></td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-dark" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset password</button></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
     </main>
   </div>
+  <%- include('partials/scripts') %>
   <script>
-    document.getElementById('create-user').addEventListener('submit', async (e) => {
+    $('#create-user').on('submit', async (e) => {
       e.preventDefault();
-      const f = new FormData(e.target);
-      try {
-        await api('/api/users', { method: 'POST', body: JSON.stringify(Object.fromEntries(f)) });
-        location.reload();
-      } catch (err) { showErr(e.target, err.message); }
+      const f = Object.fromEntries(new FormData(e.target).entries());
+      try { await api('/api/users', { method: 'POST', body: JSON.stringify(f) }); location.reload(); }
+      catch (err) { showErr(e.target, err.message); }
     });
-    document.querySelectorAll('[data-pw]').forEach((b) => b.addEventListener('click', async () => {
-      const pw = prompt(`New password for ${b.dataset.name} (min 6 chars):`);
+    $('[data-pw]').on('click', async function () {
+      const pw = prompt(`New password for ${this.dataset.name} (min 6 chars):`);
       if (!pw) return;
-      try { await api(`/api/users/${b.dataset.pw}/password`, { method: 'PATCH', body: JSON.stringify({ password: pw }) }); location.reload(); }
-      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
-    }));
+      try { await api(`/api/users/${this.dataset.pw}/password`, { method: 'PATCH', body: JSON.stringify({ password: pw }) }); location.reload(); }
+      catch (err) { showErr('.admin-main', err.message); }
+    });
   </script>
 </body>
 </html>

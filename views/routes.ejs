@@ -1,35 +1,37 @@
 <%- include('partials/head', { title: 'Routes' }) %>
   <%- include('partials/topbar') %>
-  <div class="admin-layout">
+  <div class="d-flex">
     <%- include('partials/nav', { active }) %>
-    <main class="admin-main">
-      <h1>Route optimization</h1>
-      <div class="card-form">
-        <h2>Waypoints</h2>
-        <p class="hint">One <span class="mono">lat, lon</span> per line. Orders stops by nearest-neighbour.</p>
-        <textarea id="waypoints" rows="6" class="mono"></textarea>
-        <button class="btn" id="optimize">Optimize</button>
-        <div id="route-result"></div>
-        <div class="form-error" hidden></div>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <h1 class="h4 mb-4">Route optimization</h1>
+      <div class="card mb-4" style="max-width: 640px">
+        <div class="card-body">
+          <h2 class="h6 text-uppercase text-body-secondary">Waypoints</h2>
+          <p class="small text-body-secondary">One <span class="font-monospace">lat, lon</span> per line. Orders stops by nearest-neighbour.</p>
+          <textarea id="waypoints" rows="6" class="form-control font-monospace mb-3"></textarea>
+          <button class="btn btn-dark" id="optimize">Optimize</button>
+          <div id="route-result" class="mt-3"></div>
+        </div>
       </div>
-      <div id="route-map" class="route-map"></div>
+      <div id="route-map" class="card" style="height: 420px"></div>
     </main>
   </div>
+  <%- include('partials/scripts') %>
   <script src="/vendor/leaflet/leaflet.js"></script>
   <script>
-    document.getElementById('optimize').addEventListener('click', async () => {
-      const result = document.getElementById('route-result');
-      const wps = document.getElementById('waypoints').value.split('\n').map((l) => l.trim()).filter(Boolean)
+    $('#optimize').on('click', async () => {
+      const result = $('#route-result');
+      const wps = $('#waypoints').val().split('\n').map((l) => l.trim()).filter(Boolean)
         .map((l) => l.split(',').map(Number));
       try {
         const r = await api('/api/routes/optimize', { method: 'POST', body: JSON.stringify({ waypoints: wps }) });
-        result.innerHTML = `<p>Optimal order: ${r.order.join(' → ')} · total ${r.totalKm} km (straight-line)</p>`;
+        result.html(`<p>Optimal order: ${r.order.join(' → ')} · total ${r.totalKm} km (straight-line)</p>`);
         const m = L.map('route-map').setView(r.points[0], 12);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(m);
         L.polyline(r.points, { color: '#4FB8A6' }).addTo(m);
-        r.points.forEach((p, i) => L.circleMarker(p, { radius: 5, color: i === 0 ? '#F2A93B' : '#E7ECF1' }).addTo(m).bindTooltip(String(i + 1)));
+        r.points.forEach((p, i) => L.circleMarker(p, { radius: 5, color: i === 0 ? '#F2A93B' : '#6C757D' }).addTo(m).bindTooltip(String(i + 1)));
         m.fitBounds(r.points);
-      } catch (err) { showErr(document.querySelector('.card-form'), err.message); }
+      } catch (err) { showErr(result.parent(), err.message); }
     });
   </script>
 </body>
