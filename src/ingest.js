@@ -34,12 +34,12 @@ function startIngest({ port, hub, log = console.log }) {
     try {
       frame = parseFrame(raw);
     } catch (e) {
-      log(`ingest: discarding malformed frame: ${e.message}`);
+      log(`ingest: discarding MALFORMED frame [${raw.trim()}] — ${e.message}`);
       return;
     }
     const vehicle = await getVehicleByImei(frame.imei);
-    log(`[${new Date().toLocaleString()}] ingest: unknown IMEI ${frame.imei} — frame discarded`);
     if (!vehicle) {
+      log(`[${new Date().toLocaleString()}] ingest: UNKNOWN IMEI ${frame.imei} — frame discarded [${raw.trim()}]`);
       return;
     }
     const position = await insertPosition({ vehicleId: vehicle.id, ...frame });
