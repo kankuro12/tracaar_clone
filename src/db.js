@@ -3,9 +3,22 @@ const { Pool } = require('pg');
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+// imei -> vehicle row. Ingest calls this per GPS frame, so keep hot rows in
+// memory instead of one indexed SELECT per fix. Invalidate via
+// invalidateVehicleCache() whenever vehicles are created/deleted.
+const vehicleByImei = new Map();
+
 async function getVehicleByImei(imei) {
+  if (vehicleByImei.has(imei)) return vehicleByImei.get(imei);
   const r = await pool.query('SELECT id, customer_id, imei, name, plate FROM vehicles WHERE imei = $1', [imei]);
-  return r.rows[0] || null;
+  const row = r.rows[0] || null;
+  vehicleByImei.set(imei, row); // negative hits cached too: unknown-IMEI spam never touches the DB
+  return row;
+}
+
+function invalidateVehicleCache(imei) {
+  if (imei) vehicleByImei.delete(String(imei).trim());
+  else vehicleByImei.clear();
 }
 
 async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw }) {
@@ -102,4 +115,4 @@ async function createAlert({ customerId, vehicleId, geofenceId, type, message, l
   return r.rows[0];
 }
 
-module.exports = { pool, getVehicleByImei, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert };
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert };

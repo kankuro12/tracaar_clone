@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache } = require('./db');
 
 const router = Router();
 
@@ -81,6 +81,7 @@ router.post('/vehicles', auth, requireRole('admin'), async (req, res) => {
        RETURNING id, imei, name, plate`,
       [req.user.customerId, String(imei).trim(), name, plate || '']
     );
+    invalidateVehicleCache(String(imei).trim());
     res.status(201).json(r.rows[0]);
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'imei already registered' });
@@ -360,6 +361,7 @@ router.post('/customers/:id/vehicles', auth, requireRole('super_admin'), async (
        RETURNING id, imei, name, plate`,
       [req.params.id, String(imei).trim(), name, plate || '']
     );
+    invalidateVehicleCache(String(imei).trim());
     res.status(201).json(r.rows[0]);
   } catch (e) {
     if (e.code === '23505') return res.status(409).json({ error: 'imei already registered' });
@@ -369,6 +371,7 @@ router.post('/customers/:id/vehicles', auth, requireRole('super_admin'), async (
 
 router.delete('/customers/:id/vehicles/:vid', auth, requireRole('super_admin'), async (req, res) => {
   await pool.query('DELETE FROM vehicles WHERE id = $1 AND customer_id = $2', [req.params.vid, req.params.id]);
+  invalidateVehicleCache(); // no imei known here — drop the whole cache
   res.status(204).end();
 });
 
