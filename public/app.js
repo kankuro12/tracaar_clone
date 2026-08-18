@@ -45,7 +45,7 @@ function markerIcon(v, selected) {
   const cls = selected ? 'selected' : isOnline(v) ? 'online' : 'offline';
   const inner = isOnline(v) ? '<span class="pulse"></span>' : '';
   const arrow = v.position && v.position.course != null
-    ? `<span class="arrow" style="transform: rotate(${v.position.course}deg)">▲</span>` : '';
+    ? `<span class="arrow" style="transform: rotate(${v.position.course}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>` : '';
   return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${arrow}${inner}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
 }
 
@@ -257,7 +257,10 @@ function connectWs() {
     m.setIcon(markerIcon(v, state.selected.has(v.id)));
     m.setPopupContent(popupHtml(v));
     if (state.selected.has(v.id)) {
-      if (state.selected.size === 1) drawTrail(v.id);
+      if (state.selected.size === 1) {
+        if (state.trail) state.trail.addLatLng([msg.position.lat, msg.position.lon]);
+        else drawTrail(v.id);
+      }
       map.panTo([msg.position.lat, msg.position.lon]);
     }
     renderSidebar();
