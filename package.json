@@ -7,6 +7,7 @@
   "scripts": {
     "start": "node src/server.js",
     "db:schema": "node scripts/apply-schema.js",
+    "db:migrate": "node scripts/migrate.js",
     "db:seed": "node db/seed.js",
     "db:demo": "node db/seed.js --demo",
     "db:super": "node db/seed.js",

@@ -1,13 +1,12 @@
 <%- include('partials/head', { title: 'Live map' }) %>
-  <% const showLive = true; %>
-  <%- include('partials/topbar') %>
+  <%- include('partials/topbar', { showLive: true }) %>
   <div class="d-flex" style="height: calc(100vh - 56px)">
     <aside class="d-flex flex-column p-3 bg-body-tertiary border-end" style="width: 280px; flex-shrink: 0">
       <h6 class="text-uppercase text-body-secondary fw-bold mb-2">Vehicles</h6>
       <div class="flex-grow-1 overflow-auto" id="vehicle-list"></div>
       <button class="btn btn-sm btn-outline-dark w-100 mt-2" id="show-all">Show all vehicles</button>
     </aside>
-    <div class="flex-grow-1 position-relative">
+    <div class="map-wrap flex-grow-1 position-relative">
       <div class="map-loading" id="map-loading">Loading fleet…</div>
       <div id="map" style="height: 100%"></div>
     </div>

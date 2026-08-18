@@ -50,7 +50,7 @@ const relogin = async (ctx, page, email, password) => {
     await page.waitForFunction(() => document.querySelectorAll('.marker-dot').length >= 3);
   });
   await expect('single-select draws trail + fits view', async () => {
-    const row = page.locator('.vehicle-row', { hasText: 'Porsche' }).first();
+    const row = page.locator('.vehicle-row', { hasText: 'Van 12' }).first();
     await row.click();
     await page.waitForSelector('.trail', { timeout: 15000 });
     const selected = await page.locator('.vehicle-row.selected').count();
