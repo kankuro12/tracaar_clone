@@ -38,7 +38,7 @@ function startIngest({ port, hub, log = console.log }) {
       return;
     }
     const vehicle = await getVehicleByImei(frame.imei);
-    log(`ingest: unknown IMEI ${frame.imei} — frame discarded`);
+    log(`[${new Date().toLocaleString()}] ingest: unknown IMEI ${frame.imei} — frame discarded`);
     if (!vehicle) {
       return;
     }
