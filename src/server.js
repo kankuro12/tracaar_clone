@@ -48,10 +48,10 @@ const hub = new Hub();
 hub.attach(server);
 
 async function main() {
-  await startIngest({ port: +process.env.INGEST_PORT || 9000, hub });
+  await startIngest({ port: +process.env.INGEST_PORT || 9000, host: "0.0.0.0", hub });
   startOfflineWatcher({ hub });
   startBilling({});
-  server.listen(process.env.PORT || 3000, () => {
+  server.listen(process.env.PORT || 3000, "0.0.0.0", () => {
     console.log(`api: http://localhost:${process.env.PORT || 3000}`);
   });
 }

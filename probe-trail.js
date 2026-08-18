@@ -1,0 +1,23 @@
+const { chromium } = require('playwright');
+(async () => {
+  const browser = await chromium.launch();
+  const ctx = await browser.newContext();
+  const page = await ctx.newPage();
+  page.on('console', (m) => console.log('console:', m.type(), m.text().slice(0, 150)));
+  page.on('pageerror', (e) => console.log('pageerror:', String(e).slice(0, 200)));
+  await page.goto('http://localhost:3000/login');
+  await page.fill('#email', 'admin@demo.test');
+  await page.fill('#password', 'admin123');
+  await page.click('button[type=submit]');
+  await page.waitForSelector('.vehicle-row');
+  const rows = await page.locator('.vehicle-row').count();
+  console.log('rows:', rows);
+  await page.locator('.vehicle-row', { hasText: 'Van 12' }).first().click();
+  await page.waitForTimeout(4000);
+  const trailCount = await page.locator('.trail').count();
+  console.log('trail elements:', trailCount);
+  const selected = await page.locator('.vehicle-row.selected').count();
+  console.log('selected rows:', selected);
+  await browser.close();
+  process.exit(0);
+})();

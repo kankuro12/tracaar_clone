@@ -52,7 +52,7 @@ const relogin = async (ctx, page, email, password) => {
   await expect('single-select draws trail + fits view', async () => {
     const row = page.locator('.vehicle-row', { hasText: 'Van 12' }).first();
     await row.click();
-    await page.waitForSelector('.trail', { timeout: 15000 });
+    await page.waitForFunction(() => document.querySelectorAll('.trail').length === 1, { timeout: 15000 });
     const selected = await page.locator('.vehicle-row.selected').count();
     if (selected !== 1) throw new Error(`expected 1 selected row, got ${selected}`);
     await page.screenshot({ path: 'shots/dashboard-trail.png' });
@@ -93,7 +93,7 @@ const relogin = async (ctx, page, email, password) => {
     await page.locator('tr', { hasText: `Acme Corp ${acmeStamp}` }).locator('a[href^="/admin/customers/"]').click();
     await page.getByRole('button', { name: 'Assign IMEI / register' }).waitFor();
     await page.fill('#reg-vehicle input[name="name"]', 'Acme Truck 1');
-    await page.fill('#reg-vehicle input[name="imei"]', '867421039999001');
+    await page.fill('#reg-vehicle input[name="imei"]', `8674210${String(Date.now()).slice(-8)}`);
     await page.fill('#reg-vehicle input[name="plate"]', 'AC-123');
     await page.getByRole('button', { name: 'Assign IMEI / register' }).click();
     await page.waitForFunction(() => document.body.textContent.includes('867421039999001'));
@@ -101,14 +101,14 @@ const relogin = async (ctx, page, email, password) => {
   });
   await expect('create user for client', async () => {
     await page.fill('#create-tenant-user input[name="name"]', 'Acme Driver');
-    await page.fill('#create-tenant-user input[name="email"]', 'driver@acme.io');
+    await page.fill('#create-tenant-user input[name="email"]', `driver${acmeStamp}@acme.io`);
     await page.fill('#create-tenant-user input[name="password"]', 'driver123');
     await page.getByRole('button', { name: 'Create user', exact: true }).click();
-    await page.waitForFunction(() => document.body.textContent.includes('driver@acme.io'));
+    await page.waitForFunction((s) => document.body.textContent.includes(`driver${s}@acme.io`), acmeStamp);
   });
   await expect('reset user password', async () => {
     page.once('dialog', (d) => d.accept('newpass123'));
-    await page.locator('tr', { hasText: 'driver@acme.io' }).getByRole('button', { name: 'Reset password' }).click();
+    await page.locator('tr', { hasText: `driver${acmeStamp}@acme.io` }).getByRole('button', { name: 'Reset password' }).click();
     await page.waitForTimeout(1000);
   });
   await expect('new client admin can log in', async () => {
@@ -120,7 +120,7 @@ const relogin = async (ctx, page, email, password) => {
     if (rows !== 1) throw new Error(`expected 1 vehicle, got ${rows}`);
   });
   await expect('reset password works for user login', async () => {
-    await relogin(ctx, page, 'driver@acme.io', 'newpass123');
+    await relogin(ctx, page, `driver${acmeStamp}@acme.io`, 'newpass123');
     await page.waitForFunction(() => document.body.textContent.includes('No vehicles assigned'), { timeout: 10000 });
   });
 
