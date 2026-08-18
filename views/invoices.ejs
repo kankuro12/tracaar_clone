@@ -3,20 +3,23 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Invoices</h1>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Invoices</h1>
+      </div>
       <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/invoices' }) %>
-      <div class="card">
+      
+      <div class="card overflow-hidden my-3">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Customer</th><th>Period</th><th>Amount</th><th>Status</th><th class="text-end"></th></tr></thead>
+            <thead><tr><th>Customer</th><th>Period</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
             <tbody>
               <% invoices.forEach((i) => { %>
               <tr>
-                <td class="fw-medium"><%= i.customer %></td>
-                <td class="font-monospace small"><%= i.period_start %> → <%= i.period_end %></td>
-                <td><%= money(i.amount) %></td>
-                <td><%= i.status === 'paid' ? '<span class="badge text-bg-success">Paid</span>' : '<span class="badge text-bg-warning">Open</span>' %></td>
-                <td class="text-end"><% if (i.status === 'open') { %><button class="btn btn-sm btn-outline-dark" data-pay="<%= i.id %>">Mark paid</button><% } %></td>
+                <td class="fw-semibold text-white"><%= i.customer %></td>
+                <td class="font-monospace small text-body-secondary"><%= i.period_start %> → <%= i.period_end %></td>
+                <td class="font-monospace fw-semibold"><%= money(i.amount) %></td>
+                <td><%= i.status === 'paid' ? '<span class="badge text-bg-success bg-gradient">Paid</span>' : '<span class="badge text-bg-warning bg-gradient">Open</span>' %></td>
+                <td class="text-end"><% if (i.status === 'open') { %><button class="btn btn-sm btn-outline-light" data-pay="<%= i.id %>">Mark Paid</button><% } %></td>
               </tr>
               <% }) %>
             </tbody>

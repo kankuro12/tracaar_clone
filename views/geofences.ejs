@@ -3,39 +3,61 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Geofences</h1>
-      <div class="card mb-4" style="max-width: 640px">
-        <div class="card-body">
-          <h2 class="h6 text-uppercase text-body-secondary">New zone</h2>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Geofence Zones</h1>
+        <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= geofences.length %> Active</span>
+      </div>
+
+      <div class="card mb-4" style="max-width: 680px">
+        <div class="card-body p-4">
+          <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-3" style="font-size: 11px; letter-spacing: 0.05em;">New Zone</h2>
           <form id="create-geofence" class="row g-3">
-            <div class="col-md-6"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
-            <div class="col-md-3"><label class="form-label">Latitude</label><input class="form-control" name="lat" type="number" step="any" required></div>
-            <div class="col-md-3"><label class="form-label">Longitude</label><input class="form-control" name="lon" type="number" step="any" required></div>
-            <div class="col-md-4"><label class="form-label">Radius (m)</label><input class="form-control" name="radiusM" type="number" min="1" required></div>
+            <div class="col-md-6">
+              <label class="form-label text-body-secondary small font-medium">Name</label>
+              <input class="form-control" name="name" required placeholder="Downtown Zone">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label text-body-secondary small font-medium">Latitude</label>
+              <input class="form-control font-monospace" name="lat" type="number" step="any" required placeholder="27.7172">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label text-body-secondary small font-medium">Longitude</label>
+              <input class="form-control font-monospace" name="lon" type="number" step="any" required placeholder="85.3240">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Radius (meters)</label>
+              <input class="form-control font-monospace" name="radiusM" type="number" min="1" required placeholder="500">
+            </div>
             <div class="col-md-8">
-              <label class="form-label">Vehicles</label>
-              <select class="form-select" name="vehicleIds" multiple size="4">
+              <label class="form-label text-body-secondary small font-medium">Vehicles</label>
+              <select class="form-select font-monospace" name="vehicleIds" multiple size="4">
                 <% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %>
               </select>
             </div>
-            <div class="col-12"><button class="btn btn-dark" type="submit">Create geofence</button></div>
+            <div class="col-12 mt-3">
+              <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                Create Geofence
+              </button>
+            </div>
           </form>
         </div>
       </div>
-      <div class="card">
+
+      <div class="card overflow-hidden">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Name</th><th>Center</th><th>Radius</th><th>Vehicles</th></tr></thead>
+            <thead><tr><th>Name</th><th>Center Coordinates</th><th>Radius</th><th>Assigned Vehicles</th></tr></thead>
             <tbody>
-              <% if (!geofences.length) { %><tr><td colspan="4" class="text-body-secondary">No zones yet.</td></tr><% } %>
+              <% if (!geofences.length) { %><tr><td colspan="4" class="text-body-secondary py-4 text-center">No geofence zones created yet.</td></tr><% } %>
               <% geofences.forEach((g) => { %>
               <tr>
-                <td class="fw-medium"><%= g.name %></td>
-                <td class="font-monospace small"><%= g.lat.toFixed(5) %>, <%= g.lon.toFixed(5) %></td>
-                <td><%= g.radius_m %> m</td>
+                <td class="fw-semibold text-white"><%= g.name %></td>
+                <td class="font-monospace small text-body-secondary"><%= g.lat.toFixed(5) %>, <%= g.lon.toFixed(5) %></td>
+                <td class="font-monospace text-emerald"><%= g.radius_m %> m</td>
                 <td>
                   <% g.vehicleIds.map((id) => vehicles.find((v) => v.id === id)).filter(Boolean).forEach((v) => { %>
-                    <span class="badge text-bg-light border"><%= v.name %></span>
+                    <span class="badge text-bg-dark border border-secondary-subtle font-sans"><%= v.name %></span>
                   <% }) %>
                 </td>
               </tr>

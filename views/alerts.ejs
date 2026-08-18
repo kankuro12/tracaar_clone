@@ -3,20 +3,23 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Alerts</h1>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">System Alerts</h1>
+      </div>
       <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/alerts' }) %>
-      <div class="card">
+      
+      <div class="card overflow-hidden my-3">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Time</th><th>Type</th><th>Message</th><th>Resolved</th></tr></thead>
+            <thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Resolved</th></tr></thead>
             <tbody>
-              <% if (!alerts.length) { %><tr><td colspan="4" class="text-body-secondary">No alerts yet.</td></tr><% } %>
+              <% if (!alerts.length) { %><tr><td colspan="4" class="text-body-secondary py-4 text-center">No alerts logged yet.</td></tr><% } %>
               <% alerts.forEach((a) => { %>
               <tr>
-                <td class="font-monospace small"><%= fmtDT(a.created_at) %></td>
-                <td><span class="badge <%= a.type === 'enter' || a.type === 'online' ? 'text-bg-success' : 'text-bg-danger' %>"><%= a.type %></span></td>
-                <td><%= a.message %></td>
-                <td class="font-monospace small"><%= fmtDT(a.resolved_at) %></td>
+                <td class="font-monospace small text-body-secondary"><%= fmtDT(a.created_at) %></td>
+                <td><span class="badge <%= a.type === 'enter' || a.type === 'online' ? 'text-bg-success' : 'text-bg-danger' %> font-monospace text-uppercase" style="font-size: 10px;"><%= a.type %></span></td>
+                <td class="text-white fw-medium"><%= a.message %></td>
+                <td class="font-monospace small text-body-secondary"><%= fmtDT(a.resolved_at) %></td>
               </tr>
               <% }) %>
             </tbody>

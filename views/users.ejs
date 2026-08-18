@@ -3,29 +3,62 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Users</h1>
-      <div class="card mb-4" style="max-width: 520px">
-        <div class="card-body">
-          <h2 class="h6 text-uppercase text-body-secondary">New user</h2>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Users</h1>
+        <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= users.length %> Total</span>
+      </div>
+
+      <div class="card mb-4" style="max-width: 560px">
+        <div class="card-body p-4">
+          <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-3" style="font-size: 11px; letter-spacing: 0.05em;">New User</h2>
           <form id="create-user" class="row g-3">
-            <div class="col-12"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
-            <div class="col-12"><label class="form-label">Email</label><input class="form-control" name="email" type="email" required></div>
-            <div class="col-12"><label class="form-label">Password</label><input class="form-control" name="password" type="password" required></div>
-            <div class="col-12"><button class="btn btn-dark" type="submit">Create user</button></div>
+            <div class="col-12">
+              <label class="form-label text-body-secondary small font-medium">Name</label>
+              <input class="form-control" name="name" required placeholder="Full Name">
+            </div>
+            <div class="col-12">
+              <label class="form-label text-body-secondary small font-medium">Email</label>
+              <input class="form-control" name="email" type="email" required placeholder="user@company.com">
+            </div>
+            <div class="col-12">
+              <label class="form-label text-body-secondary small font-medium">Password</label>
+              <input class="form-control" name="password" type="password" required placeholder="••••••••">
+            </div>
+            <div class="col-12 mt-3">
+              <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Create User
+              </button>
+            </div>
           </form>
         </div>
       </div>
-      <div class="card">
+
+      <div class="card overflow-hidden">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Name</th><th>Email</th><th>Role</th><th class="text-end"></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
             <tbody>
               <% users.forEach((u) => { %>
               <tr>
-                <td class="fw-medium"><%= u.name %></td>
-                <td class="font-monospace small"><%= u.email %></td>
-                <td><%= u.role %></td>
-                <td class="text-end"><button class="btn btn-sm btn-outline-dark" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset password</button></td>
+                <td class="fw-semibold text-white"><%= u.name %></td>
+                <td class="font-monospace small text-body-secondary"><%= u.email %></td>
+                <td>
+                  <span class="badge text-bg-dark border border-secondary-subtle font-monospace text-uppercase" style="font-size: 10px;"><%= u.role %></span>
+                </td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" data-pw="<%= u.id %>" data-name="<%= u.name %>">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Reset Password
+                  </button>
+                </td>
               </tr>
               <% }) %>
             </tbody>

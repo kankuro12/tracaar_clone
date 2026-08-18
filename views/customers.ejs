@@ -3,39 +3,78 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Customers</h1>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Customers</h1>
+        <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= customers.length %> Total</span>
+      </div>
+
       <div class="card mb-4">
-        <div class="card-body">
-          <h2 class="h6 text-uppercase text-body-secondary">New customer</h2>
+        <div class="card-body p-4">
+          <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-3" style="font-size: 11px; letter-spacing: 0.05em;">New Customer</h2>
           <form id="create-customer" class="row g-3">
-            <div class="col-md-4"><label class="form-label">Company</label><input class="form-control" name="name" required></div>
-            <div class="col-md-4"><label class="form-label">Admin name</label><input class="form-control" name="adminName" required></div>
-            <div class="col-md-4"><label class="form-label">Admin email</label><input class="form-control" name="adminEmail" type="email" required></div>
-            <div class="col-md-4"><label class="form-label">Admin password</label><input class="form-control" name="adminPassword" type="password" required></div>
             <div class="col-md-4">
-              <label class="form-label">Plan</label>
-              <select class="form-select" name="planId"><% plans.forEach((p) => { %><option value="<%= p.id %>"><%= p.name %> — <%= money(p.price_monthly) %></option><% }) %></select>
+              <label class="form-label text-body-secondary small font-medium">Company</label>
+              <input class="form-control" name="name" required placeholder="Acme Logistics">
             </div>
-            <div class="col-12"><button class="btn btn-dark" type="submit">Create customer</button></div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Admin Name</label>
+              <input class="form-control" name="adminName" required placeholder="John Doe">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Admin Email</label>
+              <input class="form-control" name="adminEmail" type="email" required placeholder="admin@acme.com">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Admin Password</label>
+              <input class="form-control" name="adminPassword" type="password" required placeholder="••••••••">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Plan</label>
+              <select class="form-select" name="planId">
+                <% plans.forEach((p) => { %>
+                <option value="<%= p.id %>"><%= p.name %> — <%= money(p.price_monthly) %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-12 mt-3">
+              <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+                Create Customer
+              </button>
+            </div>
           </form>
         </div>
       </div>
-      <div class="card">
+
+      <div class="card overflow-hidden">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Name</th><th>Plan</th><th>Vehicles</th><th>Users</th><th>Alert email</th><th class="text-end"></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Plan</th>
+                <th>Vehicles</th>
+                <th>Users</th>
+                <th>Alert Email</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              <% if (!customers.length) { %><tr><td colspan="6" class="text-body-secondary">No customers yet.</td></tr><% } %>
+              <% if (!customers.length) { %>
+              <tr><td colspan="6" class="text-body-secondary py-4 text-center">No customers registered yet.</td></tr>
+              <% } %>
               <% customers.forEach((c) => { %>
               <tr>
-                <td class="fw-medium"><%= c.name %></td>
-                <td><%= c.plan || '—' %></td>
-                <td><%= c.vehicle_count %></td>
-                <td><%= c.user_count %></td>
-                <td class="font-monospace small"><%= c.alert_email || '—' %></td>
+                <td class="fw-semibold text-white"><%= c.name %></td>
+                <td><span class="badge text-bg-primary bg-gradient font-monospace"><%= c.plan || '—' %></span></td>
+                <td class="font-monospace small"><%= c.vehicle_count %></td>
+                <td class="font-monospace small"><%= c.user_count %></td>
+                <td class="font-monospace small text-body-secondary"><%= c.alert_email || '—' %></td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-dark" href="/admin/customers/<%= c.id %>">Manage</a>
-                  <button class="btn btn-sm btn-outline-dark" data-edit='<%= JSON.stringify({ id: c.id, name: c.name, plan_id: c.plan_id, alert_email: c.alert_email, alert_webhook: c.alert_webhook }) %>'>Edit</button>
+                  <div class="d-inline-flex gap-2">
+                    <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" href="/admin/customers/<%= c.id %>">Manage</a>
+                    <button class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" data-edit='<%= JSON.stringify({ id: c.id, name: c.name, plan_id: c.plan_id, alert_email: c.alert_email, alert_webhook: c.alert_webhook }) %>'>Edit</button>
+                  </div>
                 </td>
               </tr>
               <% }) %>
@@ -45,17 +84,23 @@
       </div>
 
       <div class="modal fade" id="edit-modal" tabindex="-1">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <form id="edit-customer" class="p-3">
-              <h2 class="h5 mb-3" id="edit-title"></h2>
+        <div class="modal-dialog modal-dialog-centered">
+          <div class="modal-content border border-secondary-subtle" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border-radius: 14px;">
+            <form id="edit-customer" class="p-4">
+              <h2 class="h6 font-semibold text-white mb-3" id="edit-title"></h2>
               <div class="mb-3">
-                <label class="form-label">Plan</label>
+                <label class="form-label text-body-secondary small font-medium">Plan</label>
                 <select class="form-select" name="planId"><% plans.forEach((p) => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %></select>
               </div>
-              <div class="mb-3"><label class="form-label">Alert email</label><input class="form-control" name="alertEmail" type="email"></div>
-              <div class="mb-3"><label class="form-label">Alert webhook</label><input class="form-control" name="alertWebhook"></div>
-              <button class="btn btn-dark" type="submit">Save</button>
+              <div class="mb-3">
+                <label class="form-label text-body-secondary small font-medium">Alert Email</label>
+                <input class="form-control" name="alertEmail" type="email">
+              </div>
+              <div class="mb-4">
+                <label class="form-label text-body-secondary small font-medium">Alert Webhook</label>
+                <input class="form-control font-monospace" name="alertWebhook">
+              </div>
+              <button class="btn btn-primary bg-gradient w-100 py-2 font-medium" type="submit">Save Changes</button>
             </form>
           </div>
         </div>

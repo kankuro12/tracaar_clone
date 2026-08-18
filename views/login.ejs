@@ -1,21 +1,42 @@
 <%- include('partials/head', { title: 'Sign in' }) %>
-<body class="bg-body-tertiary">
-  <div class="container d-flex justify-content-center align-items-center" style="min-height: 100vh">
-    <div class="card shadow-sm" style="width: 360px">
-      <div class="card-body p-4">
-        <h1 class="h3 fw-bold text-center mb-1">FLEET</h1>
-        <p class="text-body-secondary text-center small mb-4">Live GPS tracking console</p>
+<body class="bg-dark text-light d-flex align-items-center min-vh-100" style="background-image: radial-gradient(circle at 50% 30%, rgba(59, 130, 246, 0.12) 0%, transparent 60%);">
+  <div class="container d-flex justify-content-center align-items-center">
+    <div class="card border-0 shadow-lg" style="width: 400px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(16px); border: 1px solid rgba(51, 65, 85, 0.6) !important; border-radius: 16px;">
+      <div class="card-body p-4 p-sm-5">
+        <div class="text-center mb-4">
+          <div class="d-inline-flex align-items-center justify-content-center bg-primary bg-gradient rounded-3 mb-3" style="width: 48px; height: 48px; box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);">
+            <svg xmlns="http://www.w3.org/2000/svg" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+          </div>
+          <h1 class="h3 fw-bold text-white mb-1" style="letter-spacing: -0.02em;">FLEET</h1>
+          <p class="text-body-secondary small mb-0">Live GPS tracking console</p>
+        </div>
+
         <form action="/login" method="post">
           <div class="mb-3">
-            <label class="form-label" for="email">Email</label>
-            <input class="form-control" id="email" name="email" type="email" autocomplete="username" required autofocus>
+            <label class="form-label text-body-secondary small font-medium" for="email">Email</label>
+            <div class="input-group">
+              <input class="form-control" id="email" name="email" type="email" autocomplete="username" placeholder="name@company.com" required autofocus>
+            </div>
           </div>
-          <div class="mb-3">
-            <label class="form-label" for="password">Password</label>
-            <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" required>
+          <div class="mb-4">
+            <label class="form-label text-body-secondary small font-medium" for="password">Password</label>
+            <div class="input-group">
+              <input class="form-control" id="password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" required>
+            </div>
           </div>
-          <button type="submit" class="btn btn-dark w-100">Sign in</button>
-          <% if (error) { %><div class="alert alert-danger mt-3 mb-0"><%= error %></div><% } %>
+          <button type="submit" class="btn btn-primary bg-gradient w-100 py-2 font-medium shadow-sm d-flex align-items-center justify-content-center gap-2">
+            <span>Sign in</span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+          </button>
+          <% if (error) { %>
+          <div class="alert alert-danger py-2 mt-3 mb-0 small rounded-2 d-flex align-items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            <div><%= error %></div>
+          </div>
+          <% } %>
         </form>
       </div>
     </div>

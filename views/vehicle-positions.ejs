@@ -3,25 +3,29 @@
   <div class="d-flex">
     <%- include('partials/nav', { active: 'vehicles' }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <a class="btn btn-sm btn-outline-dark mb-2" href="/admin/vehicles">← All vehicles</a>
-      <h1 class="h4 mb-4"><%= vehicle.name %> — position history</h1>
+      <a class="btn btn-sm btn-outline-light mb-3 d-inline-flex align-items-center gap-1" href="/admin/vehicles">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        All Vehicles
+      </a>
+      <h1 class="h4 mb-4 fw-bold text-white"><%= vehicle.name %> — Position History</h1>
       <%- include('partials/pager', { page, pages, total, baseUrl: `/admin/vehicles/${vehicle.id}/positions` }) %>
-      <div class="card">
+      
+      <div class="card overflow-hidden my-3">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>ID</th><th>Recorded</th><th>Device time</th><th>Valid</th><th>Lat</th><th>Lon</th><th>Speed (kn)</th><th>Course</th></tr></thead>
+            <thead><tr><th>ID</th><th>Recorded</th><th>Device Time</th><th>Valid</th><th>Lat</th><th>Lon</th><th>Speed (kn)</th><th>Course</th></tr></thead>
             <tbody>
-              <% if (!positions.length) { %><tr><td colspan="8" class="text-body-secondary">No positions recorded yet.</td></tr><% } %>
+              <% if (!positions.length) { %><tr><td colspan="8" class="text-body-secondary py-4 text-center">No telemetry positions recorded yet.</td></tr><% } %>
               <% positions.forEach((p) => { %>
               <tr>
-                <td class="font-monospace small"><%= p.id %></td>
+                <td class="font-monospace small text-body-secondary"><%= p.id %></td>
                 <td class="font-monospace small"><%= fmtDT(p.recorded_at) %></td>
-                <td class="font-monospace small"><%= fmtDT(p.device_time) %></td>
-                <td><%= p.valid ? 'yes' : 'no' %></td>
+                <td class="font-monospace small text-body-secondary"><%= fmtDT(p.device_time) %></td>
+                <td><%= p.valid ? '<span class="badge text-bg-success font-monospace">YES</span>' : '<span class="badge text-bg-secondary font-monospace">NO</span>' %></td>
                 <td class="font-monospace small"><%= p.lat.toFixed(6) %></td>
                 <td class="font-monospace small"><%= p.lon.toFixed(6) %></td>
-                <td class="font-monospace small"><%= p.speed_kn %></td>
-                <td class="font-monospace small"><%= p.course %></td>
+                <td class="font-monospace small text-warning"><%= p.speed_kn %></td>
+                <td class="font-monospace small"><%= p.course %>°</td>
               </tr>
               <% }) %>
             </tbody>

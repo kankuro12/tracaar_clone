@@ -3,17 +3,24 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Route optimization</h1>
-      <div class="card mb-4" style="max-width: 640px">
-        <div class="card-body">
-          <h2 class="h6 text-uppercase text-body-secondary">Waypoints</h2>
-          <p class="small text-body-secondary">One <span class="font-monospace">lat, lon</span> per line. Orders stops by nearest-neighbour.</p>
-          <textarea id="waypoints" rows="6" class="form-control font-monospace mb-3"></textarea>
-          <button class="btn btn-dark" id="optimize">Optimize</button>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Route Optimization</h1>
+      </div>
+
+      <div class="card mb-4" style="max-width: 680px">
+        <div class="card-body p-4">
+          <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-2" style="font-size: 11px; letter-spacing: 0.05em;">Waypoints</h2>
+          <p class="small text-body-secondary mb-3">Enter one <span class="font-monospace text-warning">lat, lon</span> coordinate per line to calculate nearest-neighbor route order.</p>
+          <textarea id="waypoints" rows="5" class="form-control font-monospace mb-3" placeholder="27.7172, 85.3240&#10;27.7200, 85.3300"></textarea>
+          <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" id="optimize">
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+            Optimize Route
+          </button>
           <div id="route-result" class="mt-3"></div>
         </div>
       </div>
-      <div id="route-map" class="card" style="height: 420px"></div>
+
+      <div id="route-map" class="card border border-secondary-subtle overflow-hidden" style="height: 480px"></div>
     </main>
   </div>
   <%- include('partials/scripts') %>
@@ -25,12 +32,12 @@
         .map((l) => l.split(',').map(Number));
       try {
         const r = await api('/api/routes/optimize', { method: 'POST', body: JSON.stringify({ waypoints: wps }) });
-        result.html(`<p>Optimal order: ${r.order.join(' → ')} · total ${r.totalKm} km (straight-line)</p>`);
+        result.html(`<div class="alert alert-success py-2 font-monospace small mb-0">Optimal order: ${r.order.join(' → ')} · Total: ${r.totalKm} km (straight-line)</div>`);
         const m = L.map('route-map').setView(r.points[0], 12);
         L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(m);
-        L.polyline(r.points, { color: '#4FB8A6' }).addTo(m);
-        r.points.forEach((p, i) => L.circleMarker(p, { radius: 5, color: i === 0 ? '#F2A93B' : '#6C757D' }).addTo(m).bindTooltip(String(i + 1)));
-        m.fitBounds(r.points);
+        L.polyline(r.points, { color: '#3b82f6', weight: 4 }).addTo(m);
+        r.points.forEach((p, i) => L.circleMarker(p, { radius: 6, color: i === 0 ? '#f59e0b' : '#10b981', fillColor: i === 0 ? '#f59e0b' : '#10b981', fillOpacity: 0.9 }).addTo(m).bindTooltip(`Stop ${i + 1}`));
+        m.fitBounds(r.points, { padding: [30, 30] });
       } catch (err) { showErr(result.parent(), err.message); }
     });
   </script>

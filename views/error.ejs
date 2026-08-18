@@ -3,7 +3,10 @@
   <div class="d-flex">
     <%- include('partials/nav', { active: '' }) %>
     <main class="flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <div class="alert alert-danger"><%= message %></div>
+      <div class="alert alert-danger border-0 shadow-sm d-flex align-items-center gap-2" style="background: rgba(244, 63, 94, 0.15); border: 1px solid rgba(244, 63, 94, 0.3) !important; color: #fda4af; border-radius: 12px;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <div><%= message %></div>
+      </div>
     </main>
   </div>
   <%- include('partials/scripts') %>

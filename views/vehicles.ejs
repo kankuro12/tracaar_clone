@@ -3,44 +3,82 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <h1 class="h4 mb-4">Vehicles</h1>
-      <div class="card mb-4" style="max-width: 640px">
-        <div class="card-body">
-          <h2 class="h6 text-uppercase text-body-secondary">Register vehicle</h2>
+      <div class="d-flex align-items-center justify-content-between mb-4">
+        <h1 class="h4 mb-0 fw-bold text-white">Vehicles</h1>
+        <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= vehicles.length %> Total</span>
+      </div>
+
+      <div class="card mb-4" style="max-width: 680px">
+        <div class="card-body p-4">
+          <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-3" style="font-size: 11px; letter-spacing: 0.05em;">Register vehicle</h2>
           <form id="create-vehicle" class="row g-3">
-            <div class="col-md-4"><label class="form-label">Name</label><input class="form-control" name="name" required></div>
-            <div class="col-md-4"><label class="form-label">IMEI</label><input class="form-control font-monospace" name="imei" required></div>
-            <div class="col-md-4"><label class="form-label">Plate</label><input class="form-control" name="plate"></div>
-            <div class="col-12"><button class="btn btn-dark" type="submit">Register</button></div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Name</label>
+              <input class="form-control" name="name" required placeholder="e.g. Bus 101">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">IMEI</label>
+              <input class="form-control font-monospace" name="imei" required placeholder="15 digits">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label text-body-secondary small font-medium">Plate</label>
+              <input class="form-control" name="plate" placeholder="BA 1 PA 1234">
+            </div>
+            <div class="col-12 mt-3">
+              <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Register Vehicle
+              </button>
+            </div>
           </form>
         </div>
       </div>
-      <div class="card">
+
+      <div class="card overflow-hidden">
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
-            <thead class="table-light"><tr><th>Name</th><th>Plate</th><th>IMEI</th><th>Destination</th><th>Assigned users</th><th class="text-end"></th></tr></thead>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Plate</th>
+                <th>IMEI</th>
+                <th>Destination</th>
+                <th>Assigned Users</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
             <tbody>
-              <% if (!vehicles.length) { %><tr><td colspan="6" class="text-body-secondary">No vehicles yet.</td></tr><% } %>
+              <% if (!vehicles.length) { %>
+              <tr><td colspan="6" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
+              <% } %>
               <% vehicles.forEach((v) => { %>
               <tr>
-                <td class="fw-medium"><%= v.name %></td>
-                <td><%= v.plate || '—' %></td>
-                <td class="font-monospace small"><%= v.imei %></td>
+                <td class="fw-semibold text-white"><%= v.name %></td>
+                <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= v.plate || '—' %></span></td>
+                <td class="font-monospace small text-body-secondary"><%= v.imei %></td>
                 <td class="font-monospace small"><%= v.destination ? `${v.destination.lat.toFixed(5)}, ${v.destination.lon.toFixed(5)}` : '—' %></td>
                 <td>
-                  <form class="d-flex gap-1 assign-form" data-vid="<%= v.id %>">
+                  <form class="d-flex gap-1 assign-form align-items-center mb-1" data-vid="<%= v.id %>">
                     <select class="form-select form-select-sm assign-user" style="width: auto">
                       <% users.forEach((u) => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
                     </select>
-                    <button class="btn btn-sm btn-outline-dark assign-add" type="submit">Assign</button>
+                    <button class="btn btn-sm btn-outline-light assign-add" type="submit">Assign</button>
                   </form>
                   <div class="assign-list">
-                    <% (assignedMap[v.id] || []).forEach((n) => { %><span class="badge text-bg-light border"><%= n %></span><% }) %>
+                    <% (assignedMap[v.id] || []).forEach((n) => { %><span class="badge text-bg-dark border border-secondary-subtle font-sans"><%= n %></span><% }) %>
                   </div>
                 </td>
                 <td class="text-end">
-                  <a class="btn btn-sm btn-outline-dark" href="/admin/vehicles/<%= v.id %>/positions">Positions</a>
-                  <button class="btn btn-sm btn-outline-dark" data-dest="<%= v.id %>" data-name="<%= v.name %>">Dest</button>
+                  <div class="d-inline-flex gap-2">
+                    <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" href="/admin/vehicles/<%= v.id %>/positions">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                      Positions
+                    </a>
+                    <button class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" data-dest="<%= v.id %>" data-name="<%= v.name %>">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                      Dest
+                    </button>
+                  </div>
                 </td>
               </tr>
               <% }) %>
@@ -50,14 +88,25 @@
       </div>
 
       <div class="modal fade" id="dest-modal" tabindex="-1">
-        <div class="modal-dialog modal-sm">
-          <div class="modal-content">
-            <form id="dest-form" class="p-3">
-              <h2 class="h5 mb-3" id="dest-title"></h2>
-              <div class="mb-3"><label class="form-label">Latitude</label><input class="form-control" name="lat" type="number" step="any"></div>
-              <div class="mb-3"><label class="form-label">Longitude</label><input class="form-control" name="lon" type="number" step="any"></div>
-              <div class="form-check mb-3"><input class="form-check-input" name="clear" type="checkbox" id="dest-clear"><label class="form-check-label" for="dest-clear">Clear destination</label></div>
-              <button class="btn btn-dark" type="submit">Save</button>
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+          <div class="modal-content border border-secondary-subtle" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border-radius: 14px;">
+            <form id="dest-form" class="p-4">
+              <h2 class="h6 font-semibold text-white mb-3" id="dest-title"></h2>
+              <div class="mb-3">
+                <label class="form-label text-body-secondary small font-medium">Latitude</label>
+                <input class="form-control font-monospace" name="lat" type="number" step="any" placeholder="27.7172">
+              </div>
+              <div class="mb-3">
+                <label class="form-label text-body-secondary small font-medium">Longitude</label>
+                <input class="form-control font-monospace" name="lon" type="number" step="any" placeholder="85.3240">
+              </div>
+              <div class="form-check mb-4">
+                <input class="form-check-input" name="clear" type="checkbox" id="dest-clear">
+                <label class="form-check-label small text-body-secondary" for="dest-clear">Clear destination</label>
+              </div>
+              <div class="d-flex justify-content-end gap-2">
+                <button class="btn btn-primary bg-gradient w-100 py-2 font-medium" type="submit">Save Destination</button>
+              </div>
             </form>
           </div>
         </div>
