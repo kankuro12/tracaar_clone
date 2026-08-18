@@ -234,7 +234,9 @@ const MOTION = {
   correctionMs: 800,   // ease-out tween to each confirmed fix (~25% of typical 5s fix interval)
   anomalyMs: 3000,     // slower tween when a fix implies implausible speed (GPS glitch, not motion)
   maxKmh: 300,         // implied-speed threshold for anomaly detection
-  staleMs: ONLINE_MS,  // stop dead reckoning after this silence; marker freezes, refresh grays it out
+  drMs: 10000,         // dead reckoning ceiling — extrapolated speed decays to 0 here, so the marker
+                       // creeps a short, believable way instead of barreling off-road in a straight line
+  staleMs: ONLINE_MS,  // absolute freeze bound if no fix at all; refresh grays the marker out
 };
 
 const anim = new Map();   // id -> { pos, last, tween, heading, headingDeg, prevFix }
@@ -259,9 +261,12 @@ function setRotation(id, deg) {
   el.style.transform = `rotate(${deg}deg)`;
 }
 
-function deadReckon(last, ms) {
+function deadReckon(last, ms, decayMs) {
   // equirectangular projection, fine for sub-km extrapolation — ponytail: great-circle if longer hauls
-  const d = ((last.speedKn * 1.852) / 3.6) * (ms / 1000);
+  const s = (last.speedKn * 1.852) / 3.6; // m/s
+  const t = ms / 1000;
+  const T = decayMs ? decayMs / 1000 : 0;
+  const d = T ? s * (t - (t * t) / (2 * T)) : s * t; // integrates speed decaying linearly to 0 at T
   const φ = (last.lat * Math.PI) / 180;
   const lat = last.lat + (d * Math.cos((last.course * Math.PI) / 180)) / 111_320;
   const lon = last.lon + (d * Math.sin((last.course * Math.PI) / 180)) / (111_320 * Math.cos(φ));
@@ -306,8 +311,8 @@ function tickMotion() {
         a.tween.from[1] + (a.tween.to[1] - a.tween.from[1]) * k,
       ];
       if (t >= 1) { a.pos = a.tween.to; a.tween = null; }
-    } else if (a.last && a.last.speedKn > 0 && now - a.last.time < MOTION.staleMs) {
-      a.pos = deadReckon(a.last, now - a.last.time);
+    } else if (a.last && a.last.speedKn > 0 && now - a.last.time < MOTION.drMs) {
+      a.pos = deadReckon(a.last, now - a.last.time, MOTION.drMs);
     }
     m.setLatLng(a.pos);
     if (state.selected.size === 1 && state.selected.has(id)) map.panTo(a.pos, { animate: false });
