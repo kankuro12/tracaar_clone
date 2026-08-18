@@ -44,7 +44,9 @@ const isOnline = (v) => v.position && Date.now() - new Date(v.position.recordedA
 function markerIcon(v, selected) {
   const cls = selected ? 'selected' : isOnline(v) ? 'online' : 'offline';
   const inner = isOnline(v) ? '<span class="pulse"></span>' : '';
-  return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${inner}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+  const arrow = v.position && v.position.course != null
+    ? `<span class="arrow" style="transform: rotate(${v.position.course}deg)">▲</span>` : '';
+  return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${arrow}${inner}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
 }
 
 /* ---------- sidebar ---------- */
@@ -250,9 +252,14 @@ function connectWs() {
     const v = state.vehicles.get(msg.vehicleId);
     if (!v) return;
     v.position = msg.position;
-    state.markers.get(v.id).setLatLng([msg.position.lat, msg.position.lon]);
-    state.markers.get(v.id).setIcon(markerIcon(v, state.selected.has(v.id)));
-    state.markers.get(v.id).bindPopup(popupHtml(v));
+    const m = state.markers.get(v.id);
+    m.setLatLng([msg.position.lat, msg.position.lon]);
+    m.setIcon(markerIcon(v, state.selected.has(v.id)));
+    m.setPopupContent(popupHtml(v));
+    if (state.selected.has(v.id)) {
+      if (state.selected.size === 1) drawTrail(v.id);
+      map.panTo([msg.position.lat, msg.position.lon]);
+    }
     renderSidebar();
   };
 
