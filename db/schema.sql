@@ -51,9 +51,9 @@ CREATE TABLE IF NOT EXISTS positions (
   course      DOUBLE PRECISION NOT NULL DEFAULT 0,
   raw_frame   TEXT NOT NULL
 );
--- latest-position lookup: DISTINCT ON (vehicle_id) ORDER BY recorded_at DESC
-CREATE INDEX IF NOT EXISTS idx_positions_vehicle_time
-  ON positions (vehicle_id, recorded_at DESC);
+-- latest-position lookup: DISTINCT ON (vehicle_id) ORDER BY device_time DESC
+CREATE INDEX IF NOT EXISTS idx_positions_vehicle_devicetime
+  ON positions (vehicle_id, device_time DESC);
 
 -- ---- geofences / alerts ----
 CREATE TABLE IF NOT EXISTS geofences (

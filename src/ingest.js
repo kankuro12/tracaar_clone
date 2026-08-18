@@ -8,6 +8,9 @@ const MAX_BUFFER = 4096;
 
 // Raw TCP listener for Sinotrack H02 frames. One frame per `#`, self-contained,
 // no session state. Malformed/unknown frames are logged and dropped.
+// last device_time seen per IMEI (in-memory; cold-starts unknown, heals on next frame)
+const lastDeviceTime = new Map();
+
 function startIngest({ port, hub, log = console.log }) {
   const server = net.createServer((socket) => {
     socket.setNoDelay(true);
@@ -43,6 +46,12 @@ function startIngest({ port, hub, log = console.log }) {
       log(`[${new Date().toLocaleString()}] ingest: UNKNOWN IMEI ${frame.imei} — frame discarded [${raw.trim()}]`);
       return;
     }
+    const seen = lastDeviceTime.get(frame.imei);
+    const ft = frame.deviceTime.getTime();
+    if (seen != null && ft < seen) {
+      log(`[${new Date().toLocaleString()}] ingest: LATE frame for ${frame.imei} — device time ${frame.deviceTime.toISOString()} older than latest ${new Date(seen).toISOString()} — still stored`);
+    }
+    if (seen == null || ft > seen) lastDeviceTime.set(frame.imei, ft);
     const position = await insertPosition({ vehicleId: vehicle.id, ...frame });
     const payload = {
       id: position.id,

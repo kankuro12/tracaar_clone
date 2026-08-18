@@ -71,7 +71,7 @@ async function latestPositions(user) {
      FROM vehicles v
      LEFT JOIN positions p ON p.vehicle_id = v.id
      ${scope.sql}
-     ORDER BY v.id, p.recorded_at DESC`,
+     ORDER BY v.id, p.device_time DESC`, // device_time = fix time as the device saw it; recorded_at is arrival time
     scope.params
   );
   return r.rows;
