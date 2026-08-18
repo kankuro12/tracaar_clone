@@ -30,6 +30,7 @@ function startIngest({ port, hub, log = console.log }) {
   });
 
   async function handleFrame(raw) {
+    log(`[${new Date().toLocaleString()}] ingest: frame [${raw.trim()}]`); // debug: log every frame
     let frame;
     try {
       frame = parseFrame(raw);
