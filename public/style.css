@@ -239,16 +239,16 @@ body {
   pointer-events: none;
 }
 
-/* heading arrow: rotated by vehicle course, pivots around the dot center */
+/* heading arrow: centered on the marker, rotates around the dot center */
 .marker-dot .arrow {
   position: absolute;
   left: 50%;
-  bottom: 50%;
+  top: 50%;
   width: 12px;
   height: 18px;
   margin-left: -6px;
-  margin-bottom: -18px;
-  transform-origin: 6px 18px;
+  margin-top: -9px;
+  transform-origin: 6px 9px;
   pointer-events: none;
 }
 .marker-dot .arrow svg {
