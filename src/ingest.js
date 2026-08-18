@@ -38,8 +38,8 @@ function startIngest({ port, hub, log = console.log }) {
       return;
     }
     const vehicle = await getVehicleByImei(frame.imei);
+    log(`ingest: unknown IMEI ${frame.imei} — frame discarded`);
     if (!vehicle) {
-      log(`ingest: unknown IMEI ${frame.imei} — frame discarded`);
       return;
     }
     const position = await insertPosition({ vehicleId: vehicle.id, ...frame });
