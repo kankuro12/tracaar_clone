@@ -1,0 +1,36 @@
+<%- include('partials/head', { title: 'Plans' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Plans</h1>
+      <form class="card-form" id="create-plan">
+        <h2>New plan</h2>
+        <label>Name <input name="name" required></label>
+        <label>Price / month <input name="priceMonthly" type="number" step="0.01" min="0" required></label>
+        <label>Max vehicles <input name="maxVehicles" type="number" placeholder="-1 = unlimited"></label>
+        <button class="btn" type="submit">Create plan</button>
+        <div class="form-error" hidden></div>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Price</th><th>Max vehicles</th></tr></thead>
+        <tbody>
+          <% plans.forEach((p) => { %>
+          <tr><td><%= p.name %></td><td><%= money(p.price_monthly) %></td><td><%= p.max_vehicles < 0 ? 'unlimited' : p.max_vehicles %></td></tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </main>
+  </div>
+  <script>
+    document.getElementById('create-plan').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api('/api/plans', { method: 'POST', body: JSON.stringify({ name: f.get('name'), priceMonthly: +f.get('priceMonthly'), maxVehicles: f.get('maxVehicles') ? +f.get('maxVehicles') : -1 }) });
+        location.reload();
+      } catch (err) { showErr(e.target, err.message); }
+    });
+  </script>
+</body>
+</html>

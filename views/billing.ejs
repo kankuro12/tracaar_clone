@@ -1,0 +1,32 @@
+<%- include('partials/head', { title: 'Billing' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Billing</h1>
+      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/billing' }) %>
+      <table class="tbl">
+        <thead><tr><th>Period</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <% if (!invoices.length) { %><tr><td colspan="4">No invoices yet — generated on server start.</td></tr><% } %>
+          <% invoices.forEach((i) => { %>
+          <tr>
+            <td class="mono"><%= i.period_start %> → <%= i.period_end %></td>
+            <td><%= money(i.amount) %></td>
+            <td><%= i.status === 'paid' ? 'Paid' : '<span class="open">Open</span>' %></td>
+            <td><% if (i.status === 'open') { %><button class="btn small" data-pay="<%= i.id %>">Mark paid</button><% } %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/billing' }) %>
+    </main>
+  </div>
+  <script>
+    document.querySelectorAll('[data-pay]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/invoices/${b.dataset.pay}/pay`, { method: 'POST' }); location.reload(); }
+      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
+    }));
+  </script>
+</body>
+</html>

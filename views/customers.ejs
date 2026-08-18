@@ -1,0 +1,80 @@
+<%- include('partials/head', { title: 'Customers' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Customers</h1>
+      <form class="card-form" id="create-customer">
+        <h2>New customer</h2>
+        <label>Company <input name="name" required></label>
+        <label>Admin name <input name="adminName" required></label>
+        <label>Admin email <input name="adminEmail" type="email" required></label>
+        <label>Admin password <input name="adminPassword" type="password" required></label>
+        <label>Plan
+          <select name="planId"><% plans.forEach((p) => { %><option value="<%= p.id %>"><%= p.name %> — <%= money(p.price_monthly) %></option><% }) %></select>
+        </label>
+        <button class="btn" type="submit">Create customer</button>
+        <div class="form-error" hidden></div>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Plan</th><th>Vehicles</th><th>Users</th><th>Alert email</th><th></th></tr></thead>
+        <tbody>
+          <% if (!customers.length) { %><tr><td colspan="6">No customers yet.</td></tr><% } %>
+          <% customers.forEach((c) => { %>
+          <tr>
+            <td><%= c.name %></td>
+            <td><%= c.plan || '—' %></td>
+            <td><%= c.vehicle_count %></td>
+            <td><%= c.user_count %></td>
+            <td class="mono"><%= c.alert_email || '—' %></td>
+            <td>
+              <a class="btn small" href="/admin/customers/<%= c.id %>">Manage</a>
+              <button class="btn small" data-edit='<%= JSON.stringify({ id: c.id, name: c.name, plan_id: c.plan_id, alert_email: c.alert_email, alert_webhook: c.alert_webhook }) %>'>Edit</button>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="modal" id="edit-modal" hidden>
+        <form class="card-form" id="edit-customer">
+          <h2 id="edit-title"></h2>
+          <label>Plan <select name="planId"><% plans.forEach((p) => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %></select></label>
+          <label>Alert email <input name="alertEmail" type="email"></label>
+          <label>Alert webhook <input name="alertWebhook"></label>
+          <button class="btn" type="submit">Save</button>
+          <div class="form-error" hidden></div>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('create-customer').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api('/api/customers', { method: 'POST', body: JSON.stringify(Object.fromEntries(f)) });
+        location.reload();
+      } catch (err) { showErr(e.target, err.message); }
+    });
+    const modal = document.getElementById('edit-modal');
+    document.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+      const c = JSON.parse(b.dataset.edit);
+      document.getElementById('edit-title').textContent = c.name;
+      const form = document.getElementById('edit-customer');
+      form.planId.value = c.plan_id || '';
+      form.alertEmail.value = c.alert_email || '';
+      form.alertWebhook.value = c.alert_webhook || '';
+      modal.hidden = false;
+      form.onsubmit = async (ev) => {
+        ev.preventDefault();
+        const f = new FormData(form);
+        try {
+          await api('/api/customers/' + c.id, { method: 'PATCH', body: JSON.stringify({ planId: +f.get('planId'), alertEmail: f.get('alertEmail') || null, alertWebhook: f.get('alertWebhook') || null }) });
+          location.reload();
+        } catch (err) { showErr(form, err.message); }
+      };
+    }));
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.hidden = true; });
+  </script>
+</body>
+</html>

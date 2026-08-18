@@ -1,0 +1,53 @@
+<%- include('partials/head', { title: 'Geofences' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Geofences</h1>
+      <form class="card-form" id="create-geofence">
+        <h2>New zone</h2>
+        <label>Name <input name="name" required></label>
+        <label>Latitude <input name="lat" type="number" step="any" required></label>
+        <label>Longitude <input name="lon" type="number" step="any" required></label>
+        <label>Radius (m) <input name="radiusM" type="number" min="1" required></label>
+        <label>Vehicles
+          <select name="vehicleIds" multiple size="4">
+            <% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %>
+          </select>
+        </label>
+        <button class="btn" type="submit">Create geofence</button>
+        <div class="form-error" hidden></div>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Center</th><th>Radius</th><th>Vehicles</th></tr></thead>
+        <tbody>
+          <% if (!geofences.length) { %><tr><td colspan="4">No zones yet.</td></tr><% } %>
+          <% geofences.forEach((g) => { %>
+          <tr>
+            <td><%= g.name %></td>
+            <td class="mono"><%= g.lat.toFixed(5) %>, <%= g.lon.toFixed(5) %></td>
+            <td><%= g.radius_m %> m</td>
+            <td>
+              <% g.vehicleIds.map((id) => vehicles.find((v) => v.id === id)).filter(Boolean).forEach((v) => { %>
+                <span class="assign-chip"><%= v.name %></span>
+              <% }) %>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </main>
+  </div>
+  <script>
+    document.getElementById('create-geofence').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      const vehicleIds = f.getAll('vehicleIds').map(Number);
+      try {
+        await api('/api/geofences', { method: 'POST', body: JSON.stringify({ name: f.get('name'), lat: +f.get('lat'), lon: +f.get('lon'), radiusM: +f.get('radiusM'), vehicleIds }) });
+        location.reload();
+      } catch (err) { showErr(e.target, err.message); }
+    });
+  </script>
+</body>
+</html>

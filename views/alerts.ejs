@@ -1,0 +1,26 @@
+<%- include('partials/head', { title: 'Alerts' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Alerts</h1>
+      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/alerts' }) %>
+      <table class="tbl">
+        <thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Resolved</th></tr></thead>
+        <tbody>
+          <% if (!alerts.length) { %><tr><td colspan="4">No alerts yet.</td></tr><% } %>
+          <% alerts.forEach((a) => { %>
+          <tr>
+            <td class="mono"><%= fmtDT(a.created_at) %></td>
+            <td><span class="alert-chip <%= a.type %>"><%= a.type %></span></td>
+            <td><%= a.message %></td>
+            <td><%= fmtDT(a.resolved_at) %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/alerts' }) %>
+    </main>
+  </div>
+</body>
+</html>

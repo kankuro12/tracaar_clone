@@ -1,0 +1,11 @@
+<%- include('partials/head', { title: 'Error' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active: '' }) %>
+    <main class="flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <div class="alert alert-danger"><%= message %></div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+</body>
+</html>

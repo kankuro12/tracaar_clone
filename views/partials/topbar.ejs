@@ -1,0 +1,17 @@
+<nav class="navbar navbar-expand navbar-dark bg-dark px-3">
+  <span class="navbar-brand fw-bold">FLEET</span>
+  <% if (typeof showLive !== 'undefined' && showLive) { %>
+  <span class="live-indicator d-flex align-items-center gap-2 text-light small">
+    <span class="live-dot" id="live-dot"></span><span id="live-text">connecting</span>
+  </span>
+  <% } %>
+  <div class="ms-auto d-flex align-items-center gap-2">
+    <span class="navbar-text text-light small d-none d-sm-inline"><%= user.name %></span>
+    <span class="badge text-bg-warning"><%= user.role.replace('_', ' ') %></span>
+    <a class="btn btn-sm btn-outline-light" href="/">Live map</a>
+    <% if (user.role === 'admin' || user.role === 'super_admin') { %>
+    <a class="btn btn-sm btn-outline-light" href="<%= nav.length ? nav[0][0] : '#' %>">Manage</a>
+    <% } %>
+    <button class="btn btn-sm btn-outline-danger" data-logout>Sign out</button>
+  </div>
+</nav>

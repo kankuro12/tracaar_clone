@@ -1,0 +1,5 @@
+<nav class="admin-nav d-flex flex-column gap-1 p-3 border-end bg-white" style="width: 200px; min-height: calc(100vh - 56px); flex-shrink: 0">
+  <% (nav || []).forEach(([href, label]) => { %>
+  <a class="admin-tab nav-link rounded px-3 <%= (href === '/admin/' + active || (active && href.indexOf(active) > -1)) ? 'active text-white bg-dark' : 'text-dark' %>" href="<%= href %>"><%= label %></a>
+  <% }) %>
+</nav>

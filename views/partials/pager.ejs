@@ -1,0 +1,20 @@
+<% if (pages > 1) { %>
+<nav class="d-flex align-items-center gap-3 mb-2">
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item <%= page <= 1 ? 'disabled' : '' %>">
+      <a class="page-link" href="<%= baseUrl %>?page=<%= page - 1 %>">Prev</a>
+    </li>
+    <% for (let p = Math.max(1, page - 2); p <= Math.min(pages, page + 2); p++) { %>
+    <li class="page-item <%= p === page ? 'active' : '' %>">
+      <a class="page-link" href="<%= baseUrl %>?page=<%= p %>"><%= p %></a>
+    </li>
+    <% } %>
+    <li class="page-item <%= page >= pages ? 'disabled' : '' %>">
+      <a class="page-link" href="<%= baseUrl %>?page=<%= page + 1 %>">Next</a>
+    </li>
+  </ul>
+  <span class="small text-body-secondary">Page <%= page %> / <%= pages %> · <%= total %> rows</span>
+</nav>
+<% } else if (total) { %>
+<p class="small text-body-secondary mb-2"><%= total %> rows</p>
+<% } %>

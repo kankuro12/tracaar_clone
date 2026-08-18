@@ -1,0 +1,90 @@
+<%- include('partials/head', { title: 'Vehicles' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Vehicles</h1>
+      <form class="card-form" id="create-vehicle">
+        <h2>Register vehicle</h2>
+        <label>Name <input name="name" required></label>
+        <label>IMEI <input name="imei" class="mono" required></label>
+        <label>Plate <input name="plate"></label>
+        <button class="btn" type="submit">Register</button>
+        <div class="form-error" hidden></div>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Plate</th><th>IMEI</th><th>Destination</th><th>Assigned users</th><th></th></tr></thead>
+        <tbody>
+          <% if (!vehicles.length) { %><tr><td colspan="6">No vehicles yet.</td></tr><% } %>
+          <% vehicles.forEach((v) => { %>
+          <tr>
+            <td><%= v.name %></td>
+            <td><%= v.plate || '—' %></td>
+            <td class="mono"><%= v.imei %></td>
+            <td class="mono"><%= v.destination ? `${v.destination.lat.toFixed(5)}, ${v.destination.lon.toFixed(5)}` : '—' %></td>
+            <td>
+              <form class="inline-form assign-form" data-vid="<%= v.id %>">
+                <select class="assign-user">
+                  <% users.forEach((u) => { %><option value="<%= u.id %>"><%= u.name %></option><% }) %>
+                </select>
+                <button class="btn small assign-add" type="submit">Assign</button>
+              </form>
+              <div class="assign-list">
+                <% (assignedMap[v.id] || []).forEach((n) => { %><span class="assign-chip"><%= n %></span><% }) %>
+              </div>
+            </td>
+            <td>
+              <a class="btn small" href="/admin/vehicles/<%= v.id %>/positions">Positions</a>
+              <button class="btn small" data-dest="<%= v.id %>" data-name="<%= v.name %>">Dest</button>
+            </td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="modal" id="dest-modal" hidden>
+        <form class="card-form" id="dest-form">
+          <h2 id="dest-title"></h2>
+          <label>Latitude <input name="lat" type="number" step="any"></label>
+          <label>Longitude <input name="lon" type="number" step="any"></label>
+          <label><input name="clear" type="checkbox"> Clear destination</label>
+          <button class="btn" type="submit">Save</button>
+          <div class="form-error" hidden></div>
+        </form>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('create-vehicle').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api('/api/vehicles', { method: 'POST', body: JSON.stringify({ name: f.get('name'), imei: f.get('imei'), plate: f.get('plate') }) });
+        location.reload();
+      } catch (err) { showErr(e.target, err.message); }
+    });
+    document.querySelectorAll('.assign-form').forEach((form) => form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      try {
+        await api(`/api/vehicles/${form.dataset.vid}/assign`, { method: 'POST', body: JSON.stringify({ userId: +form.querySelector('.assign-user').value }) });
+        location.reload();
+      } catch (err) { showErr(form, err.message); }
+    }));
+    const modal = document.getElementById('dest-modal');
+    let destVid = null;
+    document.querySelectorAll('[data-dest]').forEach((b) => b.addEventListener('click', () => {
+      destVid = b.dataset.dest;
+      document.getElementById('dest-title').textContent = `Destination for ${b.dataset.name}`;
+      modal.hidden = false;
+    }));
+    modal.addEventListener('click', (ev) => { if (ev.target === modal) modal.hidden = true; });
+    document.getElementById('dest-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        await api(`/api/vehicles/${destVid}/destination`, { method: 'PATCH', body: JSON.stringify({ lat: +f.get('lat'), lon: +f.get('lon'), clear: f.get('clear') === 'on' }) });
+        location.reload();
+      } catch (err) { showErr(e.target, err.message); }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+<%- include('partials/head', { title: 'ERP integration' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>ERP integration</h1>
+      <div class="card-form">
+        <h2>How it works</h2>
+        <p class="hint">Create an API key for the ERP. The ERP calls
+        <span class="mono">POST /api/integration/register</span> with
+        <span class="mono">{ erpClientId, email, password }</span> (the dashboard
+        admin's credentials) to obtain or rotate its key, then
+        <span class="mono">POST /api/integration/session</span> with
+        <span class="mono">{ erpClientId, apiKey, vehicleIds, sessionLengthSeconds }</span>
+        and connects to the returned <span class="mono">wsUrl</span> for live positions.</p>
+      </div>
+      <form class="card-form" id="create-key">
+        <h2>New API key</h2>
+        <label>Name (e.g. "Odoo ERP") <input name="name" required></label>
+        <label>ERP client id (ERP's own id, e.g. "odoo-prod")
+          <input name="clientId" class="mono" placeholder="required — used by the ERP to mint sessions" required></label>
+        <button class="btn" type="submit">Create key</button>
+        <div id="key-result"></div>
+        <div class="form-error" hidden></div>
+      </form>
+      <table class="tbl">
+        <thead><tr><th>Name</th><th>Client ID</th><th>Created</th><th>Status</th><th></th></tr></thead>
+        <tbody>
+          <% if (!keys.length) { %><tr><td colspan="5">No keys yet.</td></tr><% } %>
+          <% keys.forEach((k) => { %>
+          <tr>
+            <td><%= k.name %></td>
+            <td class="mono"><%= k.client_id || '—' %></td>
+            <td class="mono"><%= fmtDT(k.created_at) %></td>
+            <td><%= k.revoked_at ? '<span class="open">revoked</span>' : 'active' %></td>
+            <td><% if (!k.revoked_at) { %><button class="btn small" data-revoke="<%= k.id %>">Revoke</button><% } %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <div class="card-form">
+        <h2>Test session (current browser session)</h2>
+        <label>Vehicle ids (comma-separated)
+          <input id="test-vids" class="mono" value="<%= vehicles.map((v) => v.id).join(',') %>">
+        </label>
+        <label>TTL seconds <input id="test-ttl" type="number" value="300" min="30"></label>
+        <button class="btn" id="test-session">Mint session token</button>
+        <div id="session-result"></div>
+      </div>
+    </main>
+  </div>
+  <script>
+    document.getElementById('create-key').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = new FormData(e.target);
+      try {
+        const r = await api('/api/integration/keys', { method: 'POST', body: JSON.stringify({ name: f.get('name'), clientId: f.get('clientId') }) });
+        document.getElementById('key-result').innerHTML =
+          `<p class="hint">Key (shown once — store it):</p><textarea class="mono" rows="2" readonly>${esc(r.key)}</textarea>`;
+        document.querySelector('#create-key .form-error').hidden = true;
+      } catch (err) { showErr(e.target, err.message); }
+    });
+    document.querySelectorAll('[data-revoke]').forEach((b) => b.addEventListener('click', async () => {
+      try { await api(`/api/integration/keys/${b.dataset.revoke}/revoke`, { method: 'POST' }); location.reload(); }
+      catch (err) { showErr(document.querySelector('.admin-main'), err.message); }
+    }));
+    document.getElementById('test-session').addEventListener('click', async () => {
+      const vids = document.getElementById('test-vids').value.split(',').map(Number).filter(Boolean);
+      const ttl = +document.getElementById('test-ttl').value || 300;
+      try {
+        const r = await api('/api/integration/session', { method: 'POST', body: JSON.stringify({ vehicleIds: vids, ttlSeconds: ttl }) });
+        document.getElementById('session-result').innerHTML =
+          `<p class="hint">Expires ${new Date(r.expiresAt).toLocaleString()} — connect with:</p>
+           <textarea class="mono" rows="3" readonly>wss://${location.host}${r.wsUrl}</textarea>`;
+      } catch (err) { document.getElementById('session-result').innerHTML = `<div class="form-error">${esc(err.message)}</div>`; }
+    });
+  </script>
+</body>
+</html>

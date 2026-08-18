@@ -1,0 +1,35 @@
+{
+  "name": "fleet-tracking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-tenant live GPS fleet tracking for Sinotrack (H02) devices",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "db:schema": "node scripts/apply-schema.js",
+    "db:seed": "node db/seed.js",
+    "db:demo": "node db/seed.js --demo",
+    "db:super": "node db/seed.js",
+    "sim": "node scripts/simulate.js",
+    "emu": "set HEADING=90&& set SPEED_KMH=40&& set STEP_S=5&& node scripts/simulate.js",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "node scripts/e2e.js"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "bcryptjs": "^2.4.3",
+    "bootstrap": "^5.3.8",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.5",
+    "ejs": "^6.0.1",
+    "express": "^4.21.2",
+    "express-session": "^1.19.0",
+    "jquery": "^4.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "leaflet": "^1.9.4",
+    "nodemailer": "^9.0.5",
+    "pg": "^8.13.1",
+    "playwright": "^1.62.1",
+    "ws": "^8.18.0"
+  }
+}

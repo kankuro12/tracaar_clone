@@ -1,0 +1,7 @@
+node_modules/
+shots/
+.env
+*.log
+*.md
+*.err
+.playwright-mcp/

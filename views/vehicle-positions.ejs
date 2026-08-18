@@ -1,0 +1,31 @@
+<%- include('partials/head', { title: `${vehicle.name} — positions` }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active: 'vehicles' }) %>
+    <main class="admin-main">
+      <a class="btn small" href="/admin/vehicles">← All vehicles</a>
+      <h1><%= vehicle.name %> — position history</h1>
+      <%- include('partials/pager', { page, pages, total, baseUrl: `/admin/vehicles/${vehicle.id}/positions` }) %>
+      <table class="tbl">
+        <thead><tr><th>ID</th><th>Recorded</th><th>Device time</th><th>Valid</th><th>Lat</th><th>Lon</th><th>Speed (kn)</th><th>Course</th></tr></thead>
+        <tbody>
+          <% if (!positions.length) { %><tr><td colspan="8">No positions recorded yet.</td></tr><% } %>
+          <% positions.forEach((p) => { %>
+          <tr>
+            <td class="mono"><%= p.id %></td>
+            <td class="mono"><%= fmtDT(p.recorded_at) %></td>
+            <td class="mono"><%= fmtDT(p.device_time) %></td>
+            <td><%= p.valid ? 'yes' : 'no' %></td>
+            <td class="mono"><%= p.lat.toFixed(6) %></td>
+            <td class="mono"><%= p.lon.toFixed(6) %></td>
+            <td class="mono"><%= p.speed_kn %></td>
+            <td class="mono"><%= p.course %></td>
+          </tr>
+          <% }) %>
+        </tbody>
+      </table>
+      <%- include('partials/pager', { page, pages, total, baseUrl: `/admin/vehicles/${vehicle.id}/positions` }) %>
+    </main>
+  </div>
+</body>
+</html>

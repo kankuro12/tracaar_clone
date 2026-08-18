@@ -1,0 +1,36 @@
+<%- include('partials/head', { title: 'Routes' }) %>
+  <%- include('partials/topbar') %>
+  <div class="admin-layout">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main">
+      <h1>Route optimization</h1>
+      <div class="card-form">
+        <h2>Waypoints</h2>
+        <p class="hint">One <span class="mono">lat, lon</span> per line. Orders stops by nearest-neighbour.</p>
+        <textarea id="waypoints" rows="6" class="mono"></textarea>
+        <button class="btn" id="optimize">Optimize</button>
+        <div id="route-result"></div>
+        <div class="form-error" hidden></div>
+      </div>
+      <div id="route-map" class="route-map"></div>
+    </main>
+  </div>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+  <script>
+    document.getElementById('optimize').addEventListener('click', async () => {
+      const result = document.getElementById('route-result');
+      const wps = document.getElementById('waypoints').value.split('\n').map((l) => l.trim()).filter(Boolean)
+        .map((l) => l.split(',').map(Number));
+      try {
+        const r = await api('/api/routes/optimize', { method: 'POST', body: JSON.stringify({ waypoints: wps }) });
+        result.innerHTML = `<p>Optimal order: ${r.order.join(' → ')} · total ${r.totalKm} km (straight-line)</p>`;
+        const m = L.map('route-map').setView(r.points[0], 12);
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(m);
+        L.polyline(r.points, { color: '#4FB8A6' }).addTo(m);
+        r.points.forEach((p, i) => L.circleMarker(p, { radius: 5, color: i === 0 ? '#F2A93B' : '#E7ECF1' }).addTo(m).bindTooltip(String(i + 1)));
+        m.fitBounds(r.points);
+      } catch (err) { showErr(document.querySelector('.card-form'), err.message); }
+    });
+  </script>
+</body>
+</html>
