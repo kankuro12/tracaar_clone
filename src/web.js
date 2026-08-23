@@ -3,9 +3,8 @@
 // the session cookie, so page forms just fetch /api with no token handling.
 const { Router } = require('express');
 const bcrypt = require('bcryptjs');
-const { pool } = require('./db');
+const { pool, latestPositions, canSeeVehicle } = require('./db');
 const { sign } = require('./auth');
-const { latestPositions } = require('./db');
 
 const router = Router();
 const PER_PAGE = 25;
@@ -219,6 +218,51 @@ router.get('/admin/vehicles/:id/positions', loadUser, rolePage('admin'), async (
   ]);
   const total = +count.rows[0].count;
   res.render('vehicle-positions', { vehicle: v.rows[0], positions: rows.rows, page: q.page, pages: Math.ceil(total / q.per), total, active: 'vehicles' });
+});
+
+// ---- single vehicle live map ----
+router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'), async (req, res) => {
+  let vQuery, vParams;
+  if (req.user.role === 'super_admin') {
+    vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+                     p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
+              FROM vehicles v
+              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+              WHERE v.id = $1`;
+    vParams = [req.params.id];
+  } else {
+    vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+                     p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
+              FROM vehicles v
+              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+              WHERE v.id = $1 AND v.customer_id = $2`;
+    vParams = [req.params.id, req.user.customerId];
+  }
+  const r = await pool.query(vQuery, vParams);
+  if (!r.rows.length) return res.status(404).render('error', { message: 'vehicle not found' });
+  const row = r.rows[0];
+  const vehicle = {
+    id: row.id,
+    name: row.name,
+    plate: row.plate,
+    imei: row.imei,
+    destination: row.dest_lat != null ? { lat: row.dest_lat, lon: row.dest_lon } : null,
+    position: row.position_id ? {
+      id: row.position_id,
+      recordedAt: row.recorded_at,
+      deviceTime: row.device_time,
+      valid: row.valid,
+      lat: row.lat,
+      lon: row.lon,
+      speedKn: row.speed_kn,
+      course: row.course,
+    } : null,
+  };
+  res.render('vehicle-live', {
+    vehicle,
+    token: req.session.token,
+    active: 'vehicles',
+  });
 });
 
 module.exports = router;

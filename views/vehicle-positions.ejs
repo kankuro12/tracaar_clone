@@ -3,10 +3,16 @@
   <div class="d-flex">
     <%- include('partials/nav', { active: 'vehicles' }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <a class="btn btn-sm btn-outline-light mb-3 d-inline-flex align-items-center gap-1" href="/admin/vehicles">
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-        All Vehicles
-      </a>
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" href="/admin/vehicles">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          All Vehicles
+        </a>
+        <a class="btn btn-sm btn-primary bg-gradient d-inline-flex align-items-center gap-1" href="/admin/vehicles/<%= vehicle.id %>/live">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/></svg>
+          View Live Map
+        </a>
+      </div>
       <h1 class="h4 mb-4 fw-bold text-white"><%= vehicle.name %> — Position History</h1>
       <%- include('partials/pager', { page, pages, total, baseUrl: `/admin/vehicles/${vehicle.id}/positions` }) %>
       

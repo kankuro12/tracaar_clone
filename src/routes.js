@@ -101,6 +101,39 @@ router.get('/vehicles', auth, async (req, res) => {
   })));
 });
 
+router.get('/vehicles/:id', auth, async (req, res) => {
+  if (!(await canSeeVehicle(req.user, req.params.id))) {
+    return res.status(403).json({ error: 'not allowed to see this vehicle' });
+  }
+  const r = await pool.query(
+    `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+            p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
+     FROM vehicles v
+     LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+     WHERE v.id = $1`,
+    [req.params.id]
+  );
+  if (!r.rows.length) return res.status(404).json({ error: 'vehicle not found' });
+  const row = r.rows[0];
+  res.json({
+    id: row.id,
+    name: row.name,
+    plate: row.plate,
+    imei: row.imei,
+    destination: row.dest_lat != null ? { lat: row.dest_lat, lon: row.dest_lon } : null,
+    position: row.position_id ? {
+      id: row.position_id,
+      recordedAt: row.recorded_at,
+      deviceTime: row.device_time,
+      valid: row.valid,
+      lat: row.lat,
+      lon: row.lon,
+      speedKn: row.speed_kn,
+      course: row.course,
+    } : null,
+  });
+});
+
 // ---- Assign / unassign vehicle <-> user (admin, own tenant only) ----
 async function tenantVehicle(req, res) {
   const v = await pool.query('SELECT id, customer_id FROM vehicles WHERE id = $1', [req.params.id]);

@@ -1,0 +1,543 @@
+<%- include('partials/head', { title: `${vehicle.name} — Live Tracking` }) %>
+  <%- include('partials/topbar', { showLive: true }) %>
+  
+  <div class="vehicle-live-container">
+    <!-- Telemetry HUD Sidebar -->
+    <aside class="live-hud-panel p-3">
+      <!-- Back & Navigation -->
+      <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-dark-subtle">
+        <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1 font-medium" href="/admin/vehicles">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+          Vehicles
+        </a>
+        <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1 font-medium" href="/admin/vehicles/<%= vehicle.id %>/positions">
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          History
+        </a>
+      </div>
+
+      <!-- Vehicle Identity Card -->
+      <div class="telemetry-card mb-3">
+        <div class="d-flex align-items-start justify-content-between">
+          <div>
+            <h1 class="h5 fw-bold text-white mb-1"><%= vehicle.name %></h1>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= vehicle.plate || 'NO PLATE' %></span>
+              <span class="text-secondary small font-monospace">IMEI: <%= vehicle.imei %></span>
+            </div>
+          </div>
+          <span class="badge font-monospace px-2 py-1" id="v-status-badge">Connecting...</span>
+        </div>
+      </div>
+
+      <!-- Speed & Motion Card -->
+      <div class="telemetry-card mb-3">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Speed & Heading</div>
+        <div class="d-flex align-items-center justify-content-between">
+          <div>
+            <div class="speed-display" id="hud-speed">0</div>
+            <div class="text-secondary small font-monospace"><span id="hud-speed-kn">0</span> knots</div>
+          </div>
+          <div class="d-flex align-items-center gap-3">
+            <div class="text-end">
+              <div class="fw-bold text-white font-monospace fs-5" id="hud-course">0°</div>
+              <div class="text-secondary small font-monospace" id="hud-cardinal">N</div>
+            </div>
+            <div class="compass-container">
+              <div class="compass-needle" id="hud-compass-needle"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Coordinates & Timestamp Card -->
+      <div class="telemetry-card mb-3">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Location Telemetry</div>
+        <div class="row g-2 font-monospace small">
+          <div class="col-6">
+            <div class="text-secondary" style="font-size: 10.5px;">LATITUDE</div>
+            <div class="text-white fw-semibold" id="hud-lat"><%= vehicle.position ? vehicle.position.lat.toFixed(6) : '—' %></div>
+          </div>
+          <div class="col-6">
+            <div class="text-secondary" style="font-size: 10.5px;">LONGITUDE</div>
+            <div class="text-white fw-semibold" id="hud-lon"><%= vehicle.position ? vehicle.position.lon.toFixed(6) : '—' %></div>
+          </div>
+          <div class="col-12 mt-2 pt-2 border-top border-dark-subtle">
+            <div class="d-flex justify-content-between">
+              <span class="text-secondary" style="font-size: 11px;">Last Fix:</span>
+              <span class="text-light" id="hud-time-ago">—</span>
+            </div>
+            <div class="d-flex justify-content-between mt-1">
+              <span class="text-secondary" style="font-size: 11px;">Device Time:</span>
+              <span class="text-body-secondary" id="hud-device-time" style="font-size: 11px;"><%= vehicle.position && vehicle.position.deviceTime ? new Date(vehicle.position.deviceTime).toLocaleTimeString() : '—' %></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Destination & ETA (if active) -->
+      <div class="telemetry-card mb-3" id="hud-dest-card" style="<%= vehicle.destination ? '' : 'display: none;' %>">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2 d-flex justify-content-between">
+          <span>Destination & ETA</span>
+          <span class="badge text-bg-primary font-monospace" id="hud-eta-badge">ETA —</span>
+        </div>
+        <div class="font-monospace small">
+          <div class="d-flex justify-content-between mb-1">
+            <span class="text-secondary">Target Coords:</span>
+            <span class="text-white" id="hud-dest-coords"><%= vehicle.destination ? `${vehicle.destination.lat.toFixed(4)}, ${vehicle.destination.lon.toFixed(4)}` : '—' %></span>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="text-secondary">Est. Distance:</span>
+            <span class="text-light" id="hud-dest-dist">—</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls & Toggles Card -->
+      <div class="telemetry-card mb-3">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Map Controls</div>
+        <div class="d-flex flex-column gap-2">
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggle-follow" checked>
+            <label class="form-check-label text-light small font-medium" for="toggle-follow">Follow vehicle automatically</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggle-trail" checked>
+            <label class="form-check-label text-light small font-medium" for="toggle-trail">Show breadcrumb trail</label>
+          </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggle-geofences" checked>
+            <label class="form-check-label text-light small font-medium" for="toggle-geofences">Show geofences</label>
+          </div>
+          <div class="d-flex gap-2 mt-2">
+            <button class="btn btn-sm btn-outline-light flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 font-medium" id="btn-recenter">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
+              Recenter
+            </button>
+            <button class="btn btn-sm btn-outline-light flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 font-medium" id="btn-fit-trail">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+              Fit Trail
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Live Telemetry Fixes Log -->
+      <div class="flex-grow-1 d-flex flex-column">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Live Fix Log</div>
+        <div class="overflow-auto flex-grow-1" id="fix-stream-log" style="max-height: 180px;">
+          <div class="text-secondary small font-monospace py-2 text-center" id="log-empty">Waiting for live fixes…</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Map Canvas -->
+    <div class="map-wrap flex-grow-1 position-relative">
+      <div class="map-loading" id="map-loading">
+        <div class="d-flex flex-column align-items-center gap-2">
+          <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;"></div>
+          <span class="font-monospace text-body-secondary">Connecting vehicle telemetry stream…</span>
+        </div>
+      </div>
+      <div id="map" style="height: 100%"></div>
+    </div>
+  </div>
+
+  <script>
+    window.FLEET = {
+      user: <%- JSON.stringify(user) %>,
+      token: <%- JSON.stringify(token) %>,
+      vehicle: <%- JSON.stringify(vehicle) %>
+    };
+  </script>
+  <%- include('partials/scripts') %>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+
+  <script>
+    /* Single vehicle live tracking client */
+    const ONLINE_MS = 3 * 60 * 1000;
+    const TRAIL_MS = 6 * 3600 * 1000;
+    const DEFAULT_CENTER = [44.8993, 7.3636];
+
+    const token = window.FLEET && window.FLEET.token;
+    const user = window.FLEET && window.FLEET.user;
+    const vehicle = window.FLEET && window.FLEET.vehicle;
+    if (!token || !user || !vehicle) location.href = '/login';
+
+    const initialPos = vehicle.position ? [vehicle.position.lat, vehicle.position.lon] : DEFAULT_CENTER;
+    const map = L.map('map').setView(initialPos, vehicle.position ? 16 : 13);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    let vehicleMarker = null;
+    let markerArrow = null;
+    let trailPolyline = null;
+    let destMarker = null;
+    let geofenceLayers = [];
+    let ws = null;
+    let followVehicle = true;
+    let showTrail = true;
+    let showGeofences = true;
+
+    const kmh = (kn) => Math.round((kn || 0) * 1.852);
+    const fmt = (n) => (n != null ? Number(n).toFixed(6) : '—');
+
+    function degToCardinal(deg) {
+      const val = Math.round((deg % 360) / 22.5);
+      const arr = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+      return arr[val % 16] || 'N';
+    }
+
+    function timeSince(ts) {
+      const t = ts ? new Date(ts).getTime() : NaN;
+      if (Number.isNaN(t)) return '—';
+      const d = Date.now() - t;
+      if (d < 60_000) return `${Math.max(1, Math.floor(d / 1000))}s ago`;
+      if (d < 3600_000) return `${Math.floor(d / 60_000)}m ago`;
+      const h = Math.floor(d / 3600_000);
+      return `${h}h ${Math.floor((d % 3600_000) / 60_000)}m ago`;
+    }
+
+    const isOnline = (pos) => pos && (Date.now() - new Date(pos.recordedAt).getTime() < ONLINE_MS);
+
+    function createMarkerIcon(pos) {
+      const online = isOnline(pos);
+      const cls = online ? 'online' : 'offline';
+      const inner = online ? '<span class="pulse"></span>' : '';
+      const course = pos && pos.course != null ? pos.course : 0;
+      const arrow = `<span class="arrow" style="transform: rotate(${course}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>`;
+      return L.divIcon({
+        className: '',
+        html: `<div class="marker-dot selected ${cls}" style="width: 22px; height: 22px;">${arrow}${inner}</div>`,
+        iconSize: [22, 22],
+        iconAnchor: [11, 11]
+      });
+    }
+
+    function haversineKm(a, b) {
+      const R = 6371;
+      const dLat = ((b[0] - a[0]) * Math.PI) / 180;
+      const dLon = ((b[1] - a[1]) * Math.PI) / 180;
+      const s = Math.sin(dLat / 2) ** 2 + Math.cos((a[0] * Math.PI) / 180) * Math.cos((b[0] * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+      return 2 * R * Math.asin(Math.sqrt(s));
+    }
+
+    function etaMin(from, to) {
+      const d = haversineKm([from.lat, from.lon], [to.lat, to.lon]);
+      const speed = Math.max(5, (from.speedKn || 0) * 1.852);
+      return Math.round((d / speed) * 60);
+    }
+
+    function updateHud(pos) {
+      const statusBadge = document.getElementById('v-status-badge');
+      const online = isOnline(pos);
+      if (online) {
+        statusBadge.className = 'badge text-bg-success font-monospace px-2 py-1';
+        statusBadge.textContent = 'LIVE / ONLINE';
+      } else {
+        statusBadge.className = 'badge text-bg-secondary font-monospace px-2 py-1';
+        statusBadge.textContent = pos ? 'OFFLINE (STALE)' : 'NO FIX';
+      }
+
+      if (pos) {
+        document.getElementById('hud-speed').textContent = kmh(pos.speedKn);
+        document.getElementById('hud-speed-kn').textContent = Math.round(pos.speedKn || 0);
+        document.getElementById('hud-course').textContent = `${Math.round(pos.course || 0)}°`;
+        document.getElementById('hud-cardinal').textContent = degToCardinal(pos.course || 0);
+        document.getElementById('hud-compass-needle').style.transform = `rotate(${pos.course || 0}deg)`;
+        document.getElementById('hud-lat').textContent = fmt(pos.lat);
+        document.getElementById('hud-lon').textContent = fmt(pos.lon);
+        document.getElementById('hud-time-ago').textContent = timeSince(pos.recordedAt);
+        if (pos.deviceTime) {
+          document.getElementById('hud-device-time').textContent = new Date(pos.deviceTime).toLocaleTimeString();
+        }
+
+        if (vehicle.destination) {
+          const destCard = document.getElementById('hud-dest-card');
+          destCard.style.display = 'block';
+          const distKm = haversineKm([pos.lat, pos.lon], [vehicle.destination.lat, vehicle.destination.lon]);
+          const eta = etaMin(pos, vehicle.destination);
+          document.getElementById('hud-dest-dist').textContent = `${distKm.toFixed(2)} km`;
+          document.getElementById('hud-eta-badge').textContent = `ETA ~${eta}m`;
+        }
+      }
+    }
+
+    function appendFixLog(pos) {
+      const logContainer = document.getElementById('fix-stream-log');
+      const emptyNotice = document.getElementById('log-empty');
+      if (emptyNotice) emptyNotice.remove();
+
+      const item = document.createElement('div');
+      item.className = 'fix-history-item d-flex align-items-center justify-content-between';
+      const timeStr = pos.deviceTime ? new Date(pos.deviceTime).toLocaleTimeString() : new Date().toLocaleTimeString();
+      item.innerHTML = `
+        <span class="text-light">${timeStr}</span>
+        <span class="text-primary">${kmh(pos.speedKn)} km/h</span>
+        <span class="text-secondary">${fmt(pos.lat).slice(0, 7)}, ${fmt(pos.lon).slice(0, 7)}</span>
+      `;
+      logContainer.insertBefore(item, logContainer.firstChild);
+
+      while (logContainer.children.length > 20) {
+        logContainer.removeChild(logContainer.lastChild);
+      }
+    }
+
+    /* Motion interpolation & dead reckoning */
+    const MOTION = {
+      correctionMs: 800,
+      anomalyMs: 3000,
+      maxKmh: 300,
+      drMs: 10000,
+    };
+
+    let animState = null;
+    const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
+    const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+    function deadReckon(last, ms, decayMs) {
+      const s = (last.speedKn * 1.852) / 3.6;
+      const t = ms / 1000;
+      const T = decayMs ? decayMs / 1000 : 0;
+      const d = T ? s * (t - (t * t) / (2 * T)) : s * t;
+      const phi = (last.lat * Math.PI) / 180;
+      const lat = last.lat + (d * Math.cos((last.course * Math.PI) / 180)) / 111_320;
+      const lon = last.lon + (d * Math.sin((last.course * Math.PI) / 180)) / (111_320 * Math.cos(phi));
+      return [lat, lon];
+    }
+
+    function bearingDeg(from, to) {
+      const phi1 = (from[0] * Math.PI) / 180, phi2 = (to[0] * Math.PI) / 180;
+      const deltaLambda = ((to[1] - from[1]) * Math.PI) / 180;
+      return ((Math.atan2(Math.sin(deltaLambda) * Math.cos(phi2), Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda)) * 180) / Math.PI + 360) % 360;
+    }
+
+    function onFix(p) {
+      const now = Date.now();
+      if (!animState) {
+        animState = { pos: [p.lat, p.lon], last: null, prevFix: null, tween: null, heading: null, headingDeg: p.course || 0 };
+      }
+      const to = [p.lat, p.lon];
+      const fixTime = p.recordedAt ? new Date(p.recordedAt).getTime() : now;
+      const dt = animState.last ? (fixTime - animState.last.time) / 1000 : 0;
+      const impliedKmh = dt > 0 ? (haversineKm(animState.pos, to) / dt) * 3600 : 0;
+      const anomalous = impliedKmh > MOTION.maxKmh;
+      animState.tween = { from: animState.pos.slice(), to, start: now, dur: anomalous ? MOTION.anomalyMs : MOTION.correctionMs };
+      const targetHeading = p.course != null ? p.course : animState.prevFix ? bearingDeg(animState.prevFix, to) : animState.headingDeg;
+      animState.heading = { from: animState.headingDeg, to: targetHeading, start: now, dur: MOTION.correctionMs };
+      animState.prevFix = to;
+      animState.last = { time: fixTime, lat: p.lat, lon: p.lon, speedKn: p.speedKn || 0, course: targetHeading };
+    }
+
+    function tickMotion() {
+      const now = Date.now();
+      if (animState && vehicleMarker) {
+        if (animState.tween) {
+          const t = Math.min(1, (now - animState.tween.start) / animState.tween.dur);
+          const k = easeOut(t);
+          animState.pos = [
+            animState.tween.from[0] + (animState.tween.to[0] - animState.tween.from[0]) * k,
+            animState.tween.from[1] + (animState.tween.to[1] - animState.tween.from[1]) * k,
+          ];
+          if (t >= 1) { animState.pos = animState.tween.to; animState.tween = null; }
+        } else if (animState.last && animState.last.speedKn > 0 && now - animState.last.time < MOTION.drMs) {
+          animState.pos = deadReckon(animState.last, now - animState.last.time, MOTION.drMs);
+        }
+
+        vehicleMarker.setLatLng(animState.pos);
+        if (followVehicle) map.panTo(animState.pos, { animate: false });
+
+        if (animState.heading) {
+          const t = Math.min(1, (now - animState.heading.start) / animState.heading.dur);
+          animState.headingDeg = (animState.heading.from + shortestAngle(animState.heading.from, animState.heading.to) * easeOut(t) + 360) % 360;
+          if (t >= 1) animState.heading = null;
+        }
+
+        if (markerArrow) {
+          markerArrow.style.transform = `rotate(${animState.headingDeg}deg)`;
+        }
+      }
+    }
+
+    function motionLoop() {
+      requestAnimationFrame(motionLoop);
+      if (!document.hidden) tickMotion();
+    }
+
+    /* Trail & Geofences Loading */
+    async function loadTrail() {
+      if (trailPolyline) trailPolyline.remove();
+      trailPolyline = null;
+      try {
+        const r = await fetch(`/api/vehicles/${vehicle.id}/positions?from=${encodeURIComponent(new Date(Date.now() - TRAIL_MS).toISOString())}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!r.ok) return;
+        const pts = (await r.json()).filter((p) => p.valid).map((p) => [p.lat, p.lon]);
+        if (pts.length > 1) {
+          trailPolyline = L.polyline(pts, { className: 'trail', color: '#3b82f6', weight: 4, opacity: 0.85 }).addTo(map);
+          if (!showTrail) trailPolyline.remove();
+        }
+      } catch (err) {
+        console.error('Trail fetch error:', err);
+      }
+    }
+
+    async function loadGeofences() {
+      try {
+        const r = await fetch('/api/geofences', { headers: { Authorization: `Bearer ${token}` } });
+        if (!r.ok) return;
+        const geofences = await r.json();
+        geofenceLayers.forEach((l) => l.remove());
+        geofenceLayers = [];
+        for (const g of geofences) {
+          const circle = L.circle([g.lat, g.lon], {
+            radius: g.radius_m,
+            className: 'geofence',
+            color: '#10b981',
+            fillColor: '#10b981',
+            fillOpacity: 0.15,
+            weight: 2
+          }).bindTooltip(g.name, { permanent: false });
+          if (showGeofences) circle.addTo(map);
+          geofenceLayers.push(circle);
+        }
+      } catch (err) {
+        console.error('Geofences fetch error:', err);
+      }
+    }
+
+    function setupDestination() {
+      if (vehicle.destination) {
+        destMarker = L.circleMarker([vehicle.destination.lat, vehicle.destination.lon], {
+          radius: 8,
+          color: '#f59e0b',
+          fillColor: '#f59e0b',
+          fillOpacity: 0.8,
+          weight: 3
+        }).addTo(map).bindPopup(`<b>Destination</b><br>${vehicle.name}`);
+      }
+    }
+
+    function showAlert(alert) {
+      if (alert.vehicle_id && alert.vehicle_id !== vehicle.id) return;
+      const el = document.createElement('div');
+      const cls = alert.type === 'offline' || alert.type === 'exit' ? 'alert-banner warn' : 'alert-banner';
+      el.className = cls;
+      el.textContent = alert.message;
+      document.querySelector('.map-wrap').appendChild(el);
+      setTimeout(() => el.remove(), 8000);
+    }
+
+    /* Realtime WebSocket */
+    function connectWs() {
+      const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+      ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(token)}`);
+      const dot = document.getElementById('live-dot');
+      const label = document.getElementById('live-text');
+
+      ws.onopen = () => {
+        if (dot) dot.classList.remove('lost');
+        if (label) label.textContent = 'live';
+        ws.send(JSON.stringify({ type: 'subscribe', vehicleId: vehicle.id }));
+      };
+
+      ws.onclose = () => {
+        if (dot) dot.classList.add('lost');
+        if (label) label.textContent = 'offline — reconnecting';
+        setTimeout(connectWs, 3000);
+      };
+
+      ws.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        if (msg.type === 'alert') { showAlert(msg.alert); return; }
+        if (msg.type !== 'position' || msg.vehicleId !== vehicle.id) return;
+
+        const pos = msg.position;
+        vehicle.position = pos;
+        onFix(pos);
+        updateHud(pos);
+        appendFixLog(pos);
+
+        if (vehicleMarker) {
+          vehicleMarker.setIcon(createMarkerIcon(pos));
+          markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.arrow') : null;
+        }
+
+        if (showTrail) {
+          if (trailPolyline) trailPolyline.addLatLng([pos.lat, pos.lon]);
+          else trailPolyline = L.polyline([[pos.lat, pos.lon]], { className: 'trail', color: '#3b82f6', weight: 4 }).addTo(map);
+        }
+      };
+
+      window.addEventListener('beforeunload', () => ws.close());
+    }
+
+    /* UI Event Listeners */
+    document.getElementById('toggle-follow').addEventListener('change', (e) => {
+      followVehicle = e.target.checked;
+    });
+
+    document.getElementById('toggle-trail').addEventListener('change', (e) => {
+      showTrail = e.target.checked;
+      if (trailPolyline) {
+        if (showTrail) trailPolyline.addTo(map);
+        else trailPolyline.remove();
+      }
+    });
+
+    document.getElementById('toggle-geofences').addEventListener('change', (e) => {
+      showGeofences = e.target.checked;
+      geofenceLayers.forEach((l) => {
+        if (showGeofences) l.addTo(map);
+        else l.remove();
+      });
+    });
+
+    document.getElementById('btn-recenter').addEventListener('click', () => {
+      if (vehicle.position) {
+        map.setView([vehicle.position.lat, vehicle.position.lon], 16, { animate: true });
+      }
+    });
+
+    document.getElementById('btn-fit-trail').addEventListener('click', () => {
+      if (trailPolyline && trailPolyline.getLatLngs().length > 0) {
+        map.fitBounds(trailPolyline.getBounds(), { padding: [40, 40] });
+      } else if (vehicle.position) {
+        map.setView([vehicle.position.lat, vehicle.position.lon], 16);
+      }
+    });
+
+    /* Initial Boot */
+    async function boot() {
+      if (vehicle.position) {
+        vehicleMarker = L.marker([vehicle.position.lat, vehicle.position.lon], {
+          icon: createMarkerIcon(vehicle.position),
+          interactive: true
+        }).addTo(map);
+        markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.arrow') : null;
+        onFix(vehicle.position);
+        updateHud(vehicle.position);
+      } else {
+        updateHud(null);
+      }
+
+      setupDestination();
+      await Promise.all([loadTrail(), loadGeofences()]);
+      document.getElementById('map-loading').style.display = 'none';
+
+      connectWs();
+      motionLoop();
+
+      setInterval(() => {
+        if (vehicle.position) updateHud(vehicle.position);
+      }, 10_000);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
