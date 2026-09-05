@@ -48,6 +48,7 @@ async function notifyAlert(alert, customer) {
           lon: alert.lon,
           at: alert.created_at,
         }),
+        signal: AbortSignal.timeout(8000), // don't let a dead customer endpoint hang forever
       });
     } catch (e) { console.error(`notify: webhook failed: ${e.message}`); }
   }

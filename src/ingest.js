@@ -5,14 +5,31 @@ const { checkGeofences } = require('./geo');
 const { notifyAlert } = require('./notify');
 
 const MAX_BUFFER = 4096;
+// per-frame logging is useful while bringing devices online but is too noisy
+// to leave on at fleet scale — opt in with INGEST_LOG_FRAMES=1
+const LOG_FRAMES = process.env.INGEST_LOG_FRAMES === '1';
+// optional IP allow-list for the TCP ingest port — off by default (devices
+// authenticate only via a registered IMEI, so anyone who can reach this port
+// and knows/guesses one can inject fake positions for that vehicle). Set
+// INGEST_ALLOWED_IPS to a comma list to restrict connections, e.g. to the
+// APN/gateway range your GPS trackers connect from.
+const ALLOWED_IPS = (process.env.INGEST_ALLOWED_IPS || '')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+const normalizeIp = (ip) => (ip || '').replace(/^::ffff:/, '');
 
 // Raw TCP listener for Sinotrack H02 frames. One frame per `#`, self-contained,
 // no session state. Malformed/unknown frames are logged and dropped.
-// last device_time seen per IMEI (in-memory; cold-starts unknown, heals on next frame)
+// last device_time / position seen per IMEI (in-memory; cold-starts unknown, heals on next frame)
 const lastDeviceTime = new Map();
+const lastPosition = new Map(); // imei -> { lat, lon } — avoids a DB round-trip for geofence "previous position"
 
 function startIngest({ port, hub, log = console.log }) {
   const server = net.createServer((socket) => {
+    if (ALLOWED_IPS.length && !ALLOWED_IPS.includes(normalizeIp(socket.remoteAddress))) {
+      log(`ingest: rejecting connection from disallowed IP ${socket.remoteAddress}`);
+      socket.destroy();
+      return;
+    }
     socket.setNoDelay(true);
     let buf = '';
     socket.on('error', () => {}); // device dropped us mid-stream: ignore
@@ -34,7 +51,7 @@ function startIngest({ port, hub, log = console.log }) {
   });
 
   async function handleFrame(raw, ip) {
-    log(`[${new Date().toLocaleString()}] ingest: frame [${raw.trim()}]`); // debug: log every frame
+    if (LOG_FRAMES) log(`[${new Date().toLocaleString()}] ingest: frame [${raw.trim()}]`);
     let frame;
     try {
       frame = parseFrame(raw);
@@ -55,7 +72,9 @@ function startIngest({ port, hub, log = console.log }) {
       log(`[${new Date().toLocaleString()}] ingest: LATE frame for ${frame.imei} — device time ${frame.deviceTime.toISOString()} older than latest ${new Date(seen).toISOString()} — still stored`);
     }
     if (seen == null || ft > seen) lastDeviceTime.set(frame.imei, ft);
+    const prevPosition = lastPosition.get(frame.imei) || null;
     const position = await insertPosition({ vehicleId: vehicle.id, ...frame });
+    lastPosition.set(frame.imei, { lat: frame.lat, lon: frame.lon });
     const payload = {
       id: position.id,
       recordedAt: position.recorded_at,
@@ -69,7 +88,7 @@ function startIngest({ port, hub, log = console.log }) {
     hub.publish(vehicle.id, { type: 'position', vehicleId: vehicle.id, position: payload });
 
     // geofence transitions
-    const events = await checkGeofences(vehicle.id, frame.lat, frame.lon, position.id);
+    const events = await checkGeofences(vehicle.id, frame.lat, frame.lon, prevPosition);
     for (const ev of events) {
       const alert = await createAlert({
         customerId: ev.customer_id,

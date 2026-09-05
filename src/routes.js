@@ -1,12 +1,18 @@
 const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
-const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog } = require('./db');
+const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole, weakPassword, MIN_PASSWORD_LEN } = require('./auth');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached } = require('./db');
+const { rateLimit } = require('./ratelimit');
 
 const router = Router();
 
-router.post('/login', async (req, res) => {
+// brute-force guard: 10 attempts / 5 min per IP, keyed separately per route
+// so hammering one doesn't burn the budget for the other.
+const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, keyFn: (req) => `login:${req.ip}` });
+const registerLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, keyFn: (req) => `integration-register:${req.ip}` });
+
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'email and password required' });
   const r = await pool.query(
@@ -26,6 +32,7 @@ router.post('/customers', auth, requireRole('super_admin'), async (req, res) => 
   if (!name || !adminName || !adminEmail || !adminPassword) {
     return res.status(400).json({ error: 'name, adminName, adminEmail, adminPassword required' });
   }
+  if (weakPassword(adminPassword)) return res.status(400).json({ error: `adminPassword must be at least ${MIN_PASSWORD_LEN} chars` });
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
@@ -58,6 +65,7 @@ router.get('/users', auth, requireRole('admin'), async (req, res) => {
 router.post('/users', auth, requireRole('admin'), async (req, res) => {
   const { name, email, password } = req.body || {};
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password required' });
+  if (weakPassword(password)) return res.status(400).json({ error: `password must be at least ${MIN_PASSWORD_LEN} chars` });
   try {
     const r = await pool.query(
       `INSERT INTO users (customer_id, role, email, password_hash, name)
@@ -75,6 +83,8 @@ router.post('/users', auth, requireRole('admin'), async (req, res) => {
 router.post('/vehicles', auth, requireRole('admin'), async (req, res) => {
   const { name, imei, plate } = req.body || {};
   if (!name || !imei) return res.status(400).json({ error: 'name and imei required' });
+  const limit = await vehicleLimitReached(req.user.customerId);
+  if (limit != null) return res.status(403).json({ error: `plan limit reached (${limit} vehicles) — upgrade your plan to add more` });
   try {
     const r = await pool.query(
       `INSERT INTO vehicles (customer_id, imei, name, plate) VALUES ($1, $2, $3, $4)
@@ -109,7 +119,7 @@ router.get('/vehicles/:id', auth, async (req, res) => {
     `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
             p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
      FROM vehicles v
-     LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+     LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
      WHERE v.id = $1`,
     [req.params.id]
   );
@@ -199,7 +209,7 @@ router.get('/reports/summary', auth, async (req, res) => {
   const rows = await reportSummary(req.user, from, to);
   if (req.query.format === 'csv') {
     res.set('Content-Type', 'text/csv');
-    res.send('vehicle,plate,imei,fixes,max_kmh,avg_kmh,first_fix,last_fix\n' + rows.map((r) => `"${r.name}","${r.plate}","${r.imei}",${r.fixes},${Math.round(r.max_kmh)},${Math.round(r.avg_kmh)},"${r.first_fix || ''}","${r.last_fix || ''}"`).join('\n'));
+    res.send('vehicle,plate,imei,fixes,max_kmh,avg_kmh,distance_km,first_fix,last_fix\n' + rows.map((r) => `"${r.name}","${r.plate}","${r.imei}",${r.fixes},${Math.round(r.max_kmh)},${Math.round(r.avg_kmh)},${(+r.distance_km).toFixed(1)},"${r.first_fix || ''}","${r.last_fix || ''}"`).join('\n'));
     return;
   }
   res.json(rows);
@@ -417,11 +427,11 @@ router.get('/customers/:id/vehicles', auth, requireRole('super_admin'), async (r
   if (!(await customerExists(req, res))) return;
   const r = await pool.query(
     `SELECT v.id, v.imei, v.name, v.plate, v.created_at,
-            p.recorded_at AS last_reported
+            p.device_time AS last_reported
      FROM vehicles v
      LEFT JOIN LATERAL (
-       SELECT recorded_at FROM positions p WHERE p.vehicle_id = v.id
-       ORDER BY p.recorded_at DESC LIMIT 1
+       SELECT device_time FROM positions p WHERE p.vehicle_id = v.id
+       ORDER BY p.device_time DESC LIMIT 1
      ) p ON TRUE
      WHERE v.customer_id = $1 ORDER BY v.id`,
     [req.params.id]
@@ -433,6 +443,8 @@ router.post('/customers/:id/vehicles', auth, requireRole('super_admin'), async (
   if (!(await customerExists(req, res))) return;
   const { name, imei, plate } = req.body || {};
   if (!name || !imei) return res.status(400).json({ error: 'name and imei required' });
+  const limit = await vehicleLimitReached(req.params.id);
+  if (limit != null) return res.status(403).json({ error: `plan limit reached (${limit} vehicles) — upgrade the customer's plan to add more` });
   try {
     const r = await pool.query(
       `INSERT INTO vehicles (customer_id, imei, name, plate) VALUES ($1, $2, $3, $4)
@@ -467,6 +479,7 @@ router.post('/customers/:id/users', auth, requireRole('super_admin'), async (req
   if (!(await customerExists(req, res))) return;
   const { name, email, password, role } = req.body || {};
   if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password required' });
+  if (weakPassword(password)) return res.status(400).json({ error: `password must be at least ${MIN_PASSWORD_LEN} chars` });
   try {
     const r = await pool.query(
       `INSERT INTO users (customer_id, role, email, password_hash, name)
@@ -482,7 +495,7 @@ router.post('/customers/:id/users', auth, requireRole('super_admin'), async (req
 
 router.patch('/customers/:id/users/:uid/password', auth, requireRole('super_admin'), async (req, res) => {
   const { password } = req.body || {};
-  if (!password || password.length < 6) return res.status(400).json({ error: 'password required (min 6 chars)' });
+  if (weakPassword(password)) return res.status(400).json({ error: `password must be at least ${MIN_PASSWORD_LEN} chars` });
   const r = await pool.query(
     'UPDATE users SET password_hash = $1 WHERE id = $2 AND customer_id = $3 RETURNING id',
     [await bcrypt.hash(password, 10), req.params.uid, req.params.id]
@@ -499,7 +512,7 @@ router.delete('/customers/:id/users/:uid', auth, requireRole('super_admin'), asy
 // Admin resets the password of one of their own tenant's users
 router.patch('/users/:id/password', auth, requireRole('admin'), async (req, res) => {
   const { password } = req.body || {};
-  if (!password || password.length < 6) return res.status(400).json({ error: 'password required (min 6 chars)' });
+  if (weakPassword(password)) return res.status(400).json({ error: `password must be at least ${MIN_PASSWORD_LEN} chars` });
   const r = await pool.query(
     'UPDATE users SET password_hash = $1 WHERE id = $2 AND customer_id = $3 RETURNING id',
     [await bcrypt.hash(password, 10), req.params.id, req.user.customerId]
@@ -553,7 +566,7 @@ async function apiKeyCustomer(req, res) {
 // ERP self-service: register a client using a dashboard admin's credentials.
 // Creates the API key bound to that admin's customer, or rotates the existing
 // key if the erpClientId already has one (old key dies immediately).
-router.post('/integration/register', async (req, res) => {
+router.post('/integration/register', registerLimiter, async (req, res) => {
   const { erpClientId, email, password } = req.body || {};
   if (!erpClientId || !email || !password) {
     return res.status(400).json({ error: 'erpClientId, email, password required' });

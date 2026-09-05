@@ -14,7 +14,8 @@
     "sim": "node scripts/simulate.js",
     "emu": "set HEADING=90&& set SPEED_KMH=40&& set STEP_S=5&& node scripts/simulate.js",
     "test": "node --test test/*.test.js",
-    "test:e2e": "node scripts/e2e.js"
+    "test:e2e": "node scripts/e2e.js",
+    "db:backup": "node scripts/backup-db.js"
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",

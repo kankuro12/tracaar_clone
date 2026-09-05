@@ -27,6 +27,9 @@ function verify(token) {
 const sha256 = (s) => crypto.createHash('sha256').update(s).digest('hex');
 const randomKey = (prefix = 'fk_') => `${prefix}${crypto.randomBytes(24).toString('hex')}`;
 
+const MIN_PASSWORD_LEN = 6;
+const weakPassword = (pw) => !pw || String(pw).length < MIN_PASSWORD_LEN;
+
 // Express middleware; sets req.user. Accepts Bearer JWT (API clients) or the
 // dashboard session cookie (req.session.user, set by src/web.js login).
 function auth(req, res, next) {
@@ -47,4 +50,4 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole };
+module.exports = { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole, weakPassword, MIN_PASSWORD_LEN };

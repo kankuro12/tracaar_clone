@@ -21,6 +21,22 @@ function invalidateVehicleCache(imei) {
   else vehicleByImei.clear();
 }
 
+// null = under (or no) limit, ok to add one more vehicle. Otherwise the limit
+// that was hit, for a clear error message.
+async function vehicleLimitReached(customerId) {
+  const r = await pool.query(
+    `SELECT p.max_vehicles,
+            (SELECT count(*) FROM vehicles v WHERE v.customer_id = c.id) AS vehicle_count
+     FROM customers c LEFT JOIN plans p ON p.id = c.plan_id
+     WHERE c.id = $1`,
+    [customerId]
+  );
+  const row = r.rows[0];
+  if (!row || row.max_vehicles == null || row.max_vehicles < 0) return null; // no plan or unlimited
+  if (+row.vehicle_count >= +row.max_vehicles) return +row.max_vehicles;
+  return null;
+}
+
 async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw }) {
   const r = await pool.query(
     `INSERT INTO positions (vehicle_id, valid, lat, lon, speed_kn, course, device_time, raw_frame)
@@ -153,17 +169,25 @@ async function auditLog({ customerId, userId, action, meta }) {
   ).catch(() => {});
 }
 
-// Daily per-vehicle summary: distance (haversine on valid fixes), max speed, fix count
+// Daily per-vehicle summary: distance (consecutive valid-fix path via PostGIS),
+// max/avg speed, fix count.
 async function reportSummary(user, from, to) {
   const ids = await visibleVehicleIds(user);
   if (!ids.size) return [];
   const r = await pool.query(
-    `SELECT v.id, v.name, v.plate, v.imei,
-       COUNT(p.id) AS fixes,
-       COALESCE(MAX(p.speed_kn * 1.852), 0) AS max_kmh,
-       COALESCE(AVG(p.speed_kn * 1.852), 0) AS avg_kmh,
-       MIN(p.recorded_at) AS first_fix, MAX(p.recorded_at) AS last_fix
-     FROM vehicles v LEFT JOIN positions p ON p.vehicle_id = v.id AND p.recorded_at >= $2 AND p.recorded_at <= $3 AND p.valid
+    `WITH pts AS (
+       SELECT p.vehicle_id, p.id, p.recorded_at, p.speed_kn,
+              ST_Distance(p.point, LAG(p.point) OVER (PARTITION BY p.vehicle_id ORDER BY p.device_time)) AS dist_m
+       FROM positions p
+       WHERE p.vehicle_id = ANY($1::bigint[]) AND p.recorded_at >= $2 AND p.recorded_at <= $3 AND p.valid
+     )
+     SELECT v.id, v.name, v.plate, v.imei,
+       COUNT(pts.id) AS fixes,
+       COALESCE(MAX(pts.speed_kn * 1.852), 0) AS max_kmh,
+       COALESCE(AVG(pts.speed_kn * 1.852), 0) AS avg_kmh,
+       COALESCE(SUM(pts.dist_m), 0) / 1000.0 AS distance_km,
+       MIN(pts.recorded_at) AS first_fix, MAX(pts.recorded_at) AS last_fix
+     FROM vehicles v LEFT JOIN pts ON pts.vehicle_id = v.id
      WHERE v.id = ANY($1::bigint[]) GROUP BY v.id ORDER BY v.name`,
     [[...ids].map(Number), from, to]
   );
@@ -178,4 +202,4 @@ async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
   return pts.filter((_, i) => i % step === 0);
 }
 
-module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback };
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback, vehicleLimitReached };

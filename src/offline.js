@@ -9,13 +9,13 @@ const OFFLINE_AFTER_MIN = +process.env.OFFLINE_AFTER_MIN || 5;
 
 async function tick({ hub, log }) {
   const r = await pool.query(
-    `SELECT v.id AS vehicle_id, v.name, v.customer_id, p.recorded_at
+    `SELECT v.id AS vehicle_id, v.name, v.customer_id, p.device_time
      FROM vehicles v
      JOIN LATERAL (
-       SELECT recorded_at FROM positions p WHERE p.vehicle_id = v.id
-       ORDER BY p.recorded_at DESC LIMIT 1
+       SELECT device_time FROM positions p WHERE p.vehicle_id = v.id
+       ORDER BY p.device_time DESC LIMIT 1
      ) p ON TRUE
-     WHERE p.recorded_at < now() - make_interval(mins => $1)
+     WHERE p.device_time < now() - make_interval(mins => $1)
        AND NOT EXISTS (
          SELECT 1 FROM alerts a
          WHERE a.vehicle_id = v.id AND a.type = 'offline' AND a.resolved_at IS NULL

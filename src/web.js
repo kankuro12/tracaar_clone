@@ -5,9 +5,11 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool, latestPositions, canSeeVehicle } = require('./db');
 const { sign } = require('./auth');
+const { rateLimit } = require('./ratelimit');
 
 const router = Router();
 const PER_PAGE = 25;
+const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, keyFn: (req) => `web-login:${req.ip}` });
 
 const NAV = {
   super_admin: [
@@ -77,7 +79,7 @@ router.get('/login', (req, res) => {
   res.render('login', { error: null });
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', loginLimiter, async (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).render('login', { error: 'email and password required' });
   const r = await pool.query(
@@ -170,10 +172,10 @@ router.get('/admin/customers/:id', loadUser, rolePage('super_admin'), async (req
   const [vehicles, users] = await Promise.all([
     pool.query(
       `SELECT v.id, v.imei, v.name, v.plate, v.created_at,
-              p.recorded_at AS last_reported
+              p.device_time AS last_reported
        FROM vehicles v
-       LEFT JOIN LATERAL (SELECT recorded_at FROM positions p WHERE p.vehicle_id = v.id
-                          ORDER BY p.recorded_at DESC LIMIT 1) p ON TRUE
+       LEFT JOIN LATERAL (SELECT device_time FROM positions p WHERE p.vehicle_id = v.id
+                          ORDER BY p.device_time DESC LIMIT 1) p ON TRUE
        WHERE v.customer_id = $1 ORDER BY v.id`, [req.params.id]),
     pool.query('SELECT id, customer_id, role, email, name, created_at FROM users WHERE customer_id = $1 ORDER BY id', [req.params.id]),
   ]);
@@ -291,14 +293,14 @@ router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'
     vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
-              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
               WHERE v.id = $1`;
     vParams = [req.params.id];
   } else {
     vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
-              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY recorded_at DESC LIMIT 1) p ON TRUE
+              LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
               WHERE v.id = $1 AND v.customer_id = $2`;
     vParams = [req.params.id, req.user.customerId];
   }

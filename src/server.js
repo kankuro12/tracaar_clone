@@ -10,8 +10,17 @@ const Hub = require('./hub');
 const { startIngest } = require('./ingest');
 const { startOfflineWatcher } = require('./offline');
 const { startBilling } = require('./billing');
+const { startRetention } = require('./retention');
 
 const app = express();
+// Behind nginx/Caddy, req.ip is the proxy's address unless we trust it — which
+// would give every user one shared rate-limit budget and let one bad actor lock
+// everyone out. Set TRUST_PROXY to the number of proxies in front of this app
+// (usually 1), or a comma list of trusted addresses.
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(tp) ? +tp : tp);
+}
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 app.use(express.json());
@@ -24,14 +33,23 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(204);
   next();
 });
+if (!process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET is required (set it in .env — do not run with a default secret)');
+}
 app.use(cookieParser());
 // ponytail: MemoryStore is fine single-process; swap to a postgres store if we scale to multiple instances
 app.use(session({
-  secret: process.env.SESSION_SECRET || 'dev-session-secret-change-me',
+  secret: process.env.SESSION_SECRET,
   resave: false,
   saveUninitialized: false,
-  cookie: { httpOnly: true, sameSite: 'lax', maxAge: 7 * 24 * 3600 * 1000 },
+  cookie: {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: process.env.NODE_ENV === 'production',
+    maxAge: 7 * 24 * 3600 * 1000,
+  },
 }));
+app.get('/healthz', (req, res) => res.json({ ok: true, uptime: process.uptime() }));
 app.use('/api', routes);
 app.use(web);
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -51,6 +69,7 @@ async function main() {
   await startIngest({ port: +process.env.INGEST_PORT || 9000, host: "0.0.0.0", hub });
   startOfflineWatcher({ hub });
   startBilling({});
+  startRetention({});
   server.listen(process.env.PORT || 3000, "0.0.0.0", () => {
     console.log(`api: http://localhost:${process.env.PORT || 3000}`);
   });

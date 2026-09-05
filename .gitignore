@@ -5,3 +5,4 @@ shots/
 *.md
 *.err
 .playwright-mcp/
+db/backups/
