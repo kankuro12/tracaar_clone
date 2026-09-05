@@ -2,10 +2,11 @@
   <%- include('partials/topbar', { showLive: true }) %>
   <div class="d-flex fleet-map-container" style="height: calc(100vh - 56px)">
     <aside class="d-flex flex-column p-3 border-end border-dark-subtle map-sidebar" style="width: 300px; flex-shrink: 0; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px);">
-      <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-dark-subtle">
+      <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom">
         <h6 class="text-uppercase text-body-secondary fw-bold mb-0 font-monospace" style="font-size: 11px; letter-spacing: 0.05em;">Vehicles</h6>
         <span class="badge text-bg-primary rounded-pill font-monospace" id="vehicle-count-badge">Live</span>
       </div>
+      <input id="vehicle-search" class="form-control form-control-sm mb-2" placeholder="Search vehicles…">
       <div class="flex-grow-1 overflow-auto vehicle-list rounded-2 mb-2" id="vehicle-list"></div>
       <button class="btn btn-sm btn-outline-light w-100 py-2 d-flex align-items-center justify-content-center gap-2 font-medium" id="show-all">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>

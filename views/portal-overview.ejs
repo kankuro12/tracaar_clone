@@ -1,0 +1,36 @@
+<%- include('partials/head', { title: 'Overview' }) %>
+<%- include('partials/topbar') %>
+<div class="d-flex">
+<%- include('partials/nav', { active }) %>
+<main class="admin-main flex-grow-1 p-3 p-md-4">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <h1 class="h4 mb-0 fw-bold">Fleet overview</h1>
+    <a class="btn btn-sm btn-primary" href="/app">Open live map</a>
+  </div>
+  <div class="row g-3 mb-3">
+    <div class="col-md-4"><div class="card kpi-card p-3"><div class="text-body-secondary small">Vehicles</div><div class="kpi-value"><%= vehicles.length %></div></div></div>
+    <div class="col-md-4"><div class="card kpi-card p-3" style="border-color:var(--teal)"><div class="text-body-secondary small">Online</div><div class="kpi-value text-success"><%= online %></div></div></div>
+    <div class="col-md-4"><div class="card kpi-card p-3" style="border-color:var(--danger)"><div class="text-body-secondary small">Offline</div><div class="kpi-value text-danger"><%= offline %></div></div></div>
+  </div>
+  <div class="card overflow-hidden mb-3">
+    <div class="card-header d-flex justify-content-between align-items-center"><strong>Fleet status</strong><input class="form-control form-control-sm table-search" data-table-filter="#fleet-table" placeholder="Search vehicles…"></div>
+    <div class="table-responsive"><table class="table table-hover align-middle mb-0" id="fleet-table">
+      <thead><tr><th>Vehicle</th><th>Plate</th><th>Status</th><th>Speed</th><th>Last seen</th><th class="text-end">Open</th></tr></thead>
+      <tbody>
+      <% if (!vehicles.length) { %><tr><td colspan="6"><div class="empty-state">No vehicles assigned yet.</div></td></tr><% } %>
+      <% vehicles.forEach((v) => { const on = v.recorded_at && (Date.now() - new Date(v.recorded_at).getTime() < 180000); %>
+      <tr><td class="fw-semibold"><%= v.name %></td><td class="font-monospace small"><%= v.plate || '—' %></td>
+      <td><span class="badge <%= on ? 'text-bg-success' : 'text-bg-secondary' %>"><%= on ? 'online' : 'offline' %></span></td>
+      <td class="font-monospace small"><%= v.speed_kn != null ? Math.round(v.speed_kn * 1.852) + ' km/h' : '—' %></td>
+      <td class="font-monospace small text-body-secondary"><%= fmtDT(v.recorded_at) %></td>
+      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/portal/trips?vehicleId=<%= v.id %>">Trips</a></td></tr>
+      <% }) %></tbody>
+    </table></div>
+  </div>
+  <div class="card"><div class="card-header"><strong>Recent alerts</strong></div>
+    <div class="list-group list-group-flush"><% if (!alerts.length) { %><div class="empty-state">No alerts.</div><% } %>
+    <% alerts.forEach((a) => { %><div class="list-group-item d-flex justify-content-between"><span><%= a.message %></span><span class="font-monospace small text-body-secondary"><%= fmtDT(a.created_at) %></span></div><% }) %></div>
+  </div>
+</main></div>
+<%- include('partials/scripts') %>
+</body></html>

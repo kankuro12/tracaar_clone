@@ -17,13 +17,23 @@ const NAV = {
     ['/admin/blocked-imeis', 'Blocked IMEIs'],
   ],
   admin: [
-    ['/admin/users', 'Users'],
+    ['/portal', 'Overview'],
+    ['/app', 'Live map'],
+    ['/portal/trips', 'Trips'],
+    ['/portal/alerts', 'Alerts'],
+    ['/portal/reports', 'Reports'],
     ['/admin/vehicles', 'Vehicles'],
     ['/admin/geofences', 'Geofences'],
-    ['/admin/routes', 'Routes'],
-    ['/admin/alerts', 'Alerts'],
-    ['/admin/integration', 'Integration'],
     ['/admin/billing', 'Billing'],
+    ['/admin/integration', 'Integration'],
+  ],
+  user: [
+    ['/portal', 'Overview'],
+    ['/app', 'Live map'],
+    ['/portal/trips', 'Trips'],
+    ['/portal/alerts', 'Alerts'],
+    ['/portal/reports', 'Reports'],
+    ['/portal/billing', 'Billing'],
   ],
 };
 
@@ -83,7 +93,7 @@ router.post('/login', async (req, res) => {
     if (err) throw err;
     req.session.user = user;
     req.session.token = sign({ id: u.id, role: u.role, customer_id: u.customer_id });
-    res.redirect('/');
+    res.redirect(user.role === 'super_admin' ? '/admin/customers' : '/portal');
   });
 });
 
@@ -91,9 +101,55 @@ router.post('/logout', (req, res) => {
   req.session.destroy(() => res.redirect('/login'));
 });
 
-// ---- live map ----
-router.get('/', loadUser, (req, res) => {
-  res.render('map', { token: req.session.token, active: '' });
+// ---- public landing ----
+router.get('/', async (req, res) => {
+  if (req.session && req.session.user) return res.redirect('/portal');
+  const plans = await pool.query('SELECT name, price_monthly, max_vehicles FROM plans ORDER BY price_monthly LIMIT 3').catch(() => ({ rows: [] }));
+  res.render('landing', { plans: plans.rows, user: null, nav: [] });
+});
+
+// ---- live map (app) ----
+router.get('/app', loadUser, (req, res) => {
+  res.render('map', { token: req.session.token, active: 'app' });
+});
+
+// ---- customer portal ----
+const { latestPositions: _latest, reportSummary: _summary } = require('./db');
+router.get('/portal', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const vehicles = await _latest(req.user);
+  const online = vehicles.filter((v) => v.recorded_at && Date.now() - new Date(v.recorded_at).getTime() < 3 * 60 * 1000).length;
+  const alerts = await pool.query(
+    req.user.role === 'admin'
+      ? 'SELECT * FROM alerts WHERE customer_id = $1 ORDER BY id DESC LIMIT 5'
+      : `SELECT a.* FROM alerts a JOIN vehicle_user vu ON vu.vehicle_id = a.vehicle_id WHERE vu.user_id = $1 ORDER BY a.id DESC LIMIT 5`,
+    [req.user.role === 'admin' ? req.user.customerId : req.user.id]
+  ).then((r) => r.rows).catch(() => []);
+  res.render('portal-overview', { vehicles, online, offline: vehicles.length - online, alerts, active: 'portal', token: req.session.token });
+});
+router.get('/portal/trips', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const vehicles = await _latest(req.user);
+  res.render('portal-trips', { vehicles, active: 'portal/trips', token: req.session.token });
+});
+router.get('/portal/alerts', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const q = pageQuery(req);
+  const params = req.user.role === 'admin' ? [req.user.customerId, q.per, q.offset] : [req.user.id, q.per, q.offset];
+  const sql = req.user.role === 'admin'
+    ? 'SELECT * FROM alerts WHERE customer_id = $1 ORDER BY id DESC LIMIT $2 OFFSET $3'
+    : `SELECT a.* FROM alerts a JOIN vehicle_user vu ON vu.vehicle_id = a.vehicle_id WHERE vu.user_id = $1 ORDER BY a.id DESC LIMIT $2 OFFSET $3`;
+  const rows = await pool.query(sql, params).then((r) => r.rows).catch(() => []);
+  const csql = req.user.role === 'admin' ? 'SELECT count(*) FROM alerts WHERE customer_id = $1' : `SELECT count(*) FROM alerts a JOIN vehicle_user vu ON vu.vehicle_id = a.vehicle_id WHERE vu.user_id = $1`;
+  const total = await pool.query(csql, [params[0]]).then((r) => +r.rows[0].count).catch(() => 0);
+  res.render('portal-alerts', { alerts: rows, page: q.page, pages: Math.ceil(total / q.per), total, active: 'portal/alerts' });
+});
+router.get('/portal/reports', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const to = new Date(req.query.to || Date.now());
+  const from = new Date(req.query.from || Date.now() - 24 * 3600 * 1000);
+  const rows = await _summary(req.user, from, to).catch(() => []);
+  res.render('portal-reports', { rows, from: from.toISOString().slice(0, 16), to: to.toISOString().slice(0, 16), active: 'portal/reports' });
+});
+router.get('/portal/billing', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const rows = await pool.query('SELECT * FROM invoices WHERE customer_id = $1 ORDER BY period_end DESC LIMIT 50', [req.user.customerId]).then((r) => r.rows).catch(() => []);
+  res.render('portal-billing', { invoices: rows, active: 'portal/billing' });
 });
 
 const SUPER_ONLY = { customers: 1, 'customers/:id': 1, plans: 1, invoices: 1, 'blocked-imeis': 1 };

@@ -1,0 +1,47 @@
+<%- include('partials/head', { title: 'Trips & playback' }) %>
+<%- include('partials/topbar') %>
+<div class="d-flex">
+<%- include('partials/nav', { active }) %>
+<main class="admin-main flex-grow-1 p-3 p-md-4">
+  <h1 class="h4 fw-bold mb-3">Trips & playback</h1>
+  <div class="card p-3 mb-3"><div class="row g-2 align-items-end">
+    <div class="col-md-4"><label class="form-label small">Vehicle</label><select id="trip-vehicle" class="form-select"><% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %></select></div>
+    <div class="col-md-3"><label class="form-label small">From</label><input id="trip-from" type="datetime-local" class="form-control"></div>
+    <div class="col-md-3"><label class="form-label small">To</label><input id="trip-to" type="datetime-local" class="form-control"></div>
+    <div class="col-md-2"><button id="trip-load" class="btn btn-primary w-100">Load</button></div>
+  </div></div>
+  <div class="card overflow-hidden"><div id="trip-map" style="height:55vh"></div>
+    <div class="card-footer d-flex gap-2 align-items-center"><button id="trip-play" class="btn btn-sm btn-outline-primary">▶ Play</button><input id="trip-range" type="range" class="form-range" min="0" max="100" value="0"><span id="trip-info" class="font-monospace small text-body-secondary"></span>
+    <a id="trip-csv" class="btn btn-sm btn-outline-secondary ms-auto" href="#">CSV</a></div></div>
+</main></div>
+<%- include('partials/scripts') %>
+<script src="/vendor/leaflet/leaflet.js"></script>
+<script>
+const map = L.map('trip-map').setView([27.7, 85.3], 12);
+L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+let pts = [], line = null, marker = null, timer = null, idx = 0;
+async function load() {
+  const vid = $('#trip-vehicle').val();
+  const from = new Date($('#trip-from').val() || Date.now() - 864e5).toISOString();
+  const to = new Date($('#trip-to').val() || Date.now()).toISOString();
+  const r = await api(`/api/vehicles/${vid}/playback?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  pts = r; idx = 0;
+  if (line) line.remove(); if (marker) marker.remove();
+  const ll = pts.map((p) => [p.lat, p.lon]);
+  if (ll.length) { line = L.polyline(ll).addTo(map); map.fitBounds(ll); marker = L.marker(ll[0]).addTo(map); }
+  $('#trip-info').text(`${pts.length} fixes`);
+  $('#trip-range').attr('max', Math.max(0, pts.length - 1));
+  $('#trip-csv').attr('href', `/api/vehicles/${vid}/playback?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=csv`);
+}
+$('#trip-load').on('click', load);
+$('#trip-range').on('input', function () { idx = +this.value; if (pts[idx]) marker.setLatLng([pts[idx].lat, pts[idx].lon]); });
+$('#trip-play').on('click', () => {
+  if (timer) { clearInterval(timer); timer = null; $('#trip-play').text('▶ Play'); return; }
+  $('#trip-play').text('⏸ Pause');
+  timer = setInterval(() => { if (!pts.length) return; idx = (idx + 1) % pts.length; marker.setLatLng([pts[idx].lat, pts[idx].lon]); $('#trip-range').val(idx); }, 300);
+});
+const qs = new URLSearchParams(location.search);
+if (qs.get('vehicleId')) $('#trip-vehicle').val(qs.get('vehicleId'));
+load();
+</script>
+</body></html>

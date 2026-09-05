@@ -1,0 +1,51 @@
+<%- include('partials/head', { title: 'Live GPS fleet tracking' }) %>
+<body>
+<nav class="navbar navbar-expand px-4 py-3 topbar">
+  <span class="navbar-brand fw-bold brand-name">Tracaar</span>
+  <div class="ms-auto d-flex gap-2">
+    <a class="btn btn-sm btn-outline-secondary" href="/docs.html">Docs</a>
+    <a class="btn btn-sm btn-primary" href="/login">Sign in</a>
+  </div>
+</nav>
+<header class="hero py-5">
+  <div class="container py-4">
+    <div class="row align-items-center g-4">
+      <div class="col-lg-7">
+        <h1 class="display-5 fw-bold">Live GPS tracking your customers will trust</h1>
+        <p class="lead text-body-secondary">Trips, geofences, alerts and reports in one clean portal. White-label ready, ERP API included.</p>
+        <div class="d-flex gap-2 mt-3">
+          <a class="btn btn-primary btn-lg" href="/login">Open live demo</a>
+          <a class="btn btn-outline-secondary btn-lg" href="/docs.html">API docs</a>
+        </div>
+      </div>
+      <div class="col-lg-5">
+        <div class="card p-4">
+          <h6 class="text-uppercase text-body-secondary mb-3">Why Tracaar</h6>
+          <ul class="list-unstyled d-grid gap-2 mb-0">
+            <li>✓ Live map + trip playback</li>
+            <li>✓ Geofence enter/exit + overspeed alerts</li>
+            <li>✓ Daily distance / idle / stops reports + CSV</li>
+            <li>✓ Customer portal + ERP webhooks</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+<section class="container py-5">
+  <div class="row g-3">
+    <div class="col-md-4"><div class="card feature-card p-4 h-100"><h5>Live operations</h5><p class="text-body-secondary small mb-0">Second-by-second positions, online/offline status, trails and ETAs.</p></div></div>
+    <div class="col-md-4"><div class="card feature-card p-4 h-100"><h5>Alerts that matter</h5><p class="text-body-secondary small mb-0">Geofence, overspeed, offline and idle rules with email + webhook delivery.</p></div></div>
+    <div class="col-md-4"><div class="card feature-card p-4 h-100"><h5>Reports & billing</h5><p class="text-body-secondary small mb-0">Per-vehicle summaries, trip history export, invoices per plan.</p></div></div>
+  </div>
+  <h2 class="h4 mt-5 mb-3">Simple pricing</h2>
+  <div class="row g-3">
+    <% (plans || []).forEach((p) => { %>
+    <div class="col-md-4"><div class="card p-4"><h5><%= p.name %></h5><div class="display-6 fw-bold">$<%= p.price_monthly %></div><div class="text-body-secondary small mb-3">per month · <%= p.max_vehicles < 0 ? 'unlimited vehicles' : p.max_vehicles + ' vehicles' %></div><a class="btn btn-outline-primary w-100" href="/login">Get started</a></div></div>
+    <% }) %>
+    <% if (!(plans || []).length) { %><p class="text-body-secondary">Contact sales for a plan.</p><% } %>
+  </div>
+</section>
+<%- include('partials/scripts') %>
+</body>
+</html>

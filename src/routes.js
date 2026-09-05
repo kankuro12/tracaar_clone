@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog } = require('./db');
 
 const router = Router();
 
@@ -175,6 +175,51 @@ router.get('/vehicles/:id/positions', auth, async (req, res) => {
   const rows = await positionHistory(req.user, +req.params.id, from, to);
   if (rows === null) return res.status(403).json({ error: 'not allowed to see this vehicle' });
   res.json(rows);
+});
+
+// ---- Trip playback (downsampled valid fixes, JSON or CSV) ----
+router.get('/vehicles/:id/playback', auth, async (req, res) => {
+  const from = new Date(req.query.from || Date.now() - 24 * 3600 * 1000);
+  const to = new Date(req.query.to || Date.now());
+  if (to - from > 30 * 24 * 3600 * 1000) return res.status(400).json({ error: 'range too large (max 30 days)' });
+  const rows = await tripPlayback(req.user, +req.params.id, from, to);
+  if (rows === null) return res.status(403).json({ error: 'not allowed' });
+  if (req.query.format === 'csv') {
+    res.set('Content-Type', 'text/csv');
+    res.send('recorded_at,lat,lon,speed_kmh,course\n' + rows.map((p) => `${new Date(p.recorded_at).toISOString()},${p.lat},${p.lon},${Math.round(p.speed_kn * 1.852)},${p.course}`).join('\n'));
+    return;
+  }
+  res.json(rows);
+});
+
+// ---- Reports summary (JSON or CSV) ----
+router.get('/reports/summary', auth, async (req, res) => {
+  const from = new Date(req.query.from || Date.now() - 24 * 3600 * 1000);
+  const to = new Date(req.query.to || Date.now());
+  const rows = await reportSummary(req.user, from, to);
+  if (req.query.format === 'csv') {
+    res.set('Content-Type', 'text/csv');
+    res.send('vehicle,plate,imei,fixes,max_kmh,avg_kmh,first_fix,last_fix\n' + rows.map((r) => `"${r.name}","${r.plate}","${r.imei}",${r.fixes},${Math.round(r.max_kmh)},${Math.round(r.avg_kmh)},"${r.first_fix || ''}","${r.last_fix || ''}"`).join('\n'));
+    return;
+  }
+  res.json(rows);
+});
+
+// ---- Alert rules (admin, own tenant) ----
+router.get('/alert-rules', auth, requireRole('admin'), async (req, res) => {
+  const r = await pool.query('SELECT * FROM alert_rules WHERE customer_id = $1 ORDER BY type', [req.user.customerId]);
+  res.json(r.rows);
+});
+router.put('/alert-rules', auth, requireRole('admin'), async (req, res) => {
+  const { type, threshold, enabled } = req.body || {};
+  if (!['overspeed', 'idle', 'offline'].includes(type)) return res.status(400).json({ error: 'bad type' });
+  await pool.query(
+    `INSERT INTO alert_rules (customer_id, type, threshold, enabled) VALUES ($1,$2,$3,$4)
+     ON CONFLICT (customer_id, type) DO UPDATE SET threshold = EXCLUDED.threshold, enabled = EXCLUDED.enabled`,
+    [req.user.customerId, type, +threshold || 0, enabled !== false]
+  );
+  auditLog({ customerId: req.user.customerId, userId: req.user.id, action: 'alert_rule.upsert', meta: { type, threshold } });
+  res.status(204).end();
 });
 
 // ---- Destination (ETA target) ----

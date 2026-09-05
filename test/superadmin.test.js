@@ -24,9 +24,8 @@ test('super admin can sign in and reach the manage console', async () => {
   await page.fill('#email', 'super@fleet.test');
   await page.fill('#password', 'super123');
   await page.click('button[type=submit]');
-  await page.waitForURL(`${BASE}/`);
-  await page.click('.navbar a[href="/admin/customers"]');
   await page.waitForURL(`${BASE}/admin/customers`);
+  await page.waitForSelector('h1');
   await page.waitForSelector('h1');
   assert.match(await page.textContent('h1'), /Customers/);
 });

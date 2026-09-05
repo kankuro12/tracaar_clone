@@ -146,4 +146,36 @@ async function clearBlockedImei(imei) {
   else await pool.query(`TRUNCATE blocked_imei_hits`);
 }
 
-module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei };
+async function auditLog({ customerId, userId, action, meta }) {
+  await pool.query(
+    `INSERT INTO audit_log (customer_id, user_id, action, meta) VALUES ($1,$2,$3,$4)`,
+    [customerId || null, userId || null, action, meta ? JSON.stringify(meta) : null]
+  ).catch(() => {});
+}
+
+// Daily per-vehicle summary: distance (haversine on valid fixes), max speed, fix count
+async function reportSummary(user, from, to) {
+  const ids = await visibleVehicleIds(user);
+  if (!ids.size) return [];
+  const r = await pool.query(
+    `SELECT v.id, v.name, v.plate, v.imei,
+       COUNT(p.id) AS fixes,
+       COALESCE(MAX(p.speed_kn * 1.852), 0) AS max_kmh,
+       COALESCE(AVG(p.speed_kn * 1.852), 0) AS avg_kmh,
+       MIN(p.recorded_at) AS first_fix, MAX(p.recorded_at) AS last_fix
+     FROM vehicles v LEFT JOIN positions p ON p.vehicle_id = v.id AND p.recorded_at >= $2 AND p.recorded_at <= $3 AND p.valid
+     WHERE v.id = ANY($1::bigint[]) GROUP BY v.id ORDER BY v.name`,
+    [[...ids].map(Number), from, to]
+  );
+  return r.rows;
+}
+
+async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
+  const rows = await positionHistory(user, vehicleId, from, to);
+  if (rows === null) return null;
+  const pts = rows.filter((p) => p.valid);
+  const step = Math.max(1, Math.ceil(pts.length / maxPoints));
+  return pts.filter((_, i) => i % step === 0);
+}
+
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback };

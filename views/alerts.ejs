@@ -3,8 +3,9 @@
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">System Alerts</h1>
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h1 class="h4 mb-0 fw-bold">System Alerts</h1>
+        <input class="form-control form-control-sm table-search" data-table-filter=".table" placeholder="Search alerts…">
       </div>
       <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/alerts' }) %>
       

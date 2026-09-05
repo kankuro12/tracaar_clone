@@ -1,0 +1,21 @@
+<%- include('partials/head', { title: 'Reports' }) %>
+<%- include('partials/topbar') %>
+<div class="d-flex"><%- include('partials/nav', { active }) %>
+<main class="admin-main flex-grow-1 p-3 p-md-4">
+<h1 class="h4 fw-bold mb-3">Reports</h1>
+<div class="card p-3 mb-3"><form class="row g-2" method="get">
+<div class="col-md-4"><label class="form-label small">From</label><input name="from" type="datetime-local" class="form-control" value="<%= from %>"></div>
+<div class="col-md-4"><label class="form-label small">To</label><input name="to" type="datetime-local" class="form-control" value="<%= to %>"></div>
+<div class="col-md-2 d-flex align-items-end"><button class="btn btn-primary w-100">Run</button></div>
+<div class="col-md-2 d-flex align-items-end"><a class="btn btn-outline-secondary w-100" href="/api/reports/summary?from=<%= encodeURIComponent(from) %>&to=<%= encodeURIComponent(to) %>&format=csv">CSV</a></div>
+</form></div>
+<div class="card overflow-hidden"><div class="card-header"><input class="form-control form-control-sm table-search" data-table-filter="#reports-table" placeholder="Search…"></div>
+<div class="table-responsive"><table class="table table-hover mb-0" id="reports-table">
+<thead><tr><th>Vehicle</th><th>Fixes</th><th>Max</th><th>Avg</th><th>First fix</th><th>Last fix</th></tr></thead><tbody>
+<% if (!rows.length) { %><tr><td colspan="6"><div class="empty-state">No data in range.</div></td></tr><% } %>
+<% rows.forEach((r) => { %><tr><td class="fw-semibold"><%= r.name %></td><td class="font-monospace"><%= r.fixes %></td><td class="font-monospace"><%= Math.round(r.max_kmh) %> km/h</td><td class="font-monospace"><%= Math.round(r.avg_kmh) %> km/h</td><td class="font-monospace small"><%= fmtDT(r.first_fix) %></td><td class="font-monospace small"><%= fmtDT(r.last_fix) %></td></tr><% }) %>
+</tbody></table></div></div>
+<p class="small text-body-secondary mt-2">Distance from valid-fix path available via API <span class="font-monospace">/api/reports/summary</span>.</p>
+</main></div>
+<%- include('partials/scripts') %>
+</body></html>

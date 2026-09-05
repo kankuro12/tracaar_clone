@@ -147,3 +147,26 @@ CREATE TABLE IF NOT EXISTS blocked_imei_hits (
   last_lon   DOUBLE PRECISION
 );
 CREATE INDEX IF NOT EXISTS idx_blocked_imei_last_seen ON blocked_imei_hits (last_seen DESC);
+
+-- ---- Professional rollout: branding, rules, audit ----
+ALTER TABLE customers
+  ADD COLUMN IF NOT EXISTS logo_url TEXT,
+  ADD COLUMN IF NOT EXISTS brand_color TEXT DEFAULT '#2563eb',
+  ADD COLUMN IF NOT EXISTS subdomain TEXT;
+CREATE TABLE IF NOT EXISTS alert_rules (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('overspeed','idle','offline')),
+  threshold INT NOT NULL DEFAULT 0,
+  enabled BOOLEAN NOT NULL DEFAULT TRUE,
+  UNIQUE (customer_id, type)
+);
+CREATE TABLE IF NOT EXISTS audit_log (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  customer_id BIGINT REFERENCES customers(id) ON DELETE CASCADE,
+  user_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+  action TEXT NOT NULL,
+  meta JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_customer_time ON audit_log (customer_id, created_at DESC);

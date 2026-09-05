@@ -1,0 +1,12 @@
+<%- include('head', { title }) %>
+<%- include('topbar', { showLive: typeof showLive !== 'undefined' ? showLive : false }) %>
+<div class="app-shell d-flex">
+  <%- include('nav', { active }) %>
+  <main class="admin-main flex-grow-1 p-3 p-md-4"><%- body %>
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" id="toast-box"></div>
+  </main>
+</div>
+<%- include('scripts') %>
+<%- typeof extraScripts !== 'undefined' ? extraScripts : '' %>
+</body>
+</html>

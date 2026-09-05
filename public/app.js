@@ -52,12 +52,15 @@ function markerIcon(v, selected) {
 /* ---------- sidebar ---------- */
 function renderSidebar() {
   const list = document.getElementById('vehicle-list');
-  if (state.vehicles.size === 0) {
-    list.innerHTML = '<div class="no-vehicles">No vehicles assigned to your account.</div>';
+  const q = (document.getElementById('vehicle-search')?.value || '').toLowerCase();
+  const items = [...state.vehicles.values()].filter((v) => v.name.toLowerCase().includes(q)).sort((a, b) => a.name.localeCompare(b.name));
+  document.getElementById('vehicle-count-badge').textContent = `${items.length} / ${state.vehicles.size}`;
+  if (items.length === 0) {
+    list.innerHTML = '<div class="no-vehicles">No vehicles match.</div>';
     return;
   }
   list.innerHTML = '';
-  for (const v of state.vehicles.values()) {
+  for (const v of items) {
     const row = document.createElement('div');
     const online = isOnline(v);
     const selected = state.selected.has(v.id);
@@ -144,6 +147,7 @@ document.getElementById('show-all').addEventListener('click', () => {
   state.selected.clear();
   applySelection();
 });
+document.getElementById('vehicle-search')?.addEventListener('input', renderSidebar);
 
 /* ---------- markers ---------- */
 function upsertVehicle(v, selectable) {

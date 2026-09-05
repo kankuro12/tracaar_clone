@@ -1,0 +1,13 @@
+<%- include('partials/head', { title: 'Billing' }) %>
+<%- include('partials/topbar') %>
+<div class="d-flex"><%- include('partials/nav', { active }) %>
+<main class="admin-main flex-grow-1 p-3 p-md-4">
+<h1 class="h4 fw-bold mb-3">Billing</h1>
+<div class="card overflow-hidden"><div class="table-responsive"><table class="table mb-0">
+<thead><tr><th>Period</th><th>Amount</th><th>Status</th></tr></thead><tbody>
+<% if (!invoices.length) { %><tr><td colspan="3"><div class="empty-state">No invoices yet.</div></td></tr><% } %>
+<% invoices.forEach((i) => { %><tr><td class="font-monospace small"><%= i.period_start %> → <%= i.period_end %></td><td class="fw-semibold">$<%= i.amount %></td><td><span class="badge <%= i.status === 'paid' ? 'text-bg-success' : 'text-bg-warning' %>"><%= i.status %></span></td></tr><% }) %>
+</tbody></table></div></div>
+</main></div>
+<%- include('partials/scripts') %>
+</body></html>

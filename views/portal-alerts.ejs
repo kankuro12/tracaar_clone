@@ -1,0 +1,15 @@
+<%- include('partials/head', { title: 'Alerts' }) %>
+<%- include('partials/topbar') %>
+<div class="d-flex"><%- include('partials/nav', { active }) %>
+<main class="admin-main flex-grow-1 p-3 p-md-4">
+<h1 class="h4 fw-bold mb-3">Alerts</h1>
+<%- include('partials/pager', { page, pages, total, baseUrl: '/portal/alerts' }) %>
+<div class="card overflow-hidden my-3"><div class="card-header"><input class="form-control form-control-sm table-search" data-table-filter="#alerts-table" placeholder="Search alerts…"></div>
+<div class="table-responsive"><table class="table table-hover mb-0" id="alerts-table">
+<thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Resolved</th></tr></thead><tbody>
+<% if (!alerts.length) { %><tr><td colspan="4"><div class="empty-state">No alerts — clean fleet.</div></td></tr><% } %>
+<% alerts.forEach((a) => { %><tr><td class="font-monospace small"><%= fmtDT(a.created_at) %></td><td><span class="badge text-bg-secondary"><%= a.type %></span></td><td><%= a.message %></td><td class="font-monospace small"><%= fmtDT(a.resolved_at) %></td></tr><% }) %>
+</tbody></table></div></div>
+</main></div>
+<%- include('partials/scripts') %>
+</body></html>
