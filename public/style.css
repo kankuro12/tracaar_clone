@@ -80,11 +80,18 @@ a { color: var(--primary); }
 
 .admin-nav {
   width: 230px;
-  min-height: calc(100vh - 56px);
+  height: calc(100vh - 56px);
+  position: sticky;
+  top: 56px;
   flex-shrink: 0;
   background: var(--panel);
   border-color: var(--border) !important;
 }
+
+/* the item list scrolls on its own; the theme-toggle/sign-out footer always
+   stays pinned in view instead of being pushed below the fold by a long
+   nav list (see .nav-items / .nav-footer in partials/nav.ejs) */
+.nav-items { min-height: 0; }
 
 /* off-canvas backdrop for the mobile nav drawer; only ever shown below 768px */
 .nav-backdrop { display: none; }
