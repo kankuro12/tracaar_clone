@@ -27,8 +27,10 @@ app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'views'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
-// CORS — ERP/3rd-party servers call the API cross-origin (tokens in headers, no cookies)
-app.use((req, res, next) => {
+// CORS — ERP/3rd-party servers call the API cross-origin (tokens in headers, no cookies).
+// Scoped to /api only: a wildcard ACAO header on other responses (e.g. /sw.js) makes
+// Chrome refuse to install the service worker ("unknown error fetching the script").
+app.use('/api', (req, res, next) => {
   res.set('Access-Control-Allow-Origin', '*');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
