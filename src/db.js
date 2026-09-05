@@ -37,12 +37,13 @@ async function vehicleLimitReached(customerId) {
   return null;
 }
 
-async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw }) {
+async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw, status, statusHex, ignition }) {
   const r = await pool.query(
-    `INSERT INTO positions (vehicle_id, valid, lat, lon, speed_kn, course, device_time, raw_frame)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-     RETURNING id, recorded_at, device_time, valid, lat, lon, speed_kn, course`,
-    [vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw]
+    `INSERT INTO positions (vehicle_id, valid, lat, lon, speed_kn, course, device_time, raw_frame, status, status_hex, ignition)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+     RETURNING id, recorded_at, device_time, valid, lat, lon, speed_kn, course, ignition, status_hex`,
+    [vehicleId, valid, lat, lon, speedKn, course, deviceTime, raw,
+      status ?? null, statusHex ?? null, ignition ?? null]
   );
   return r.rows[0];
 }

@@ -1,0 +1,80 @@
+<%- include('partials/head', { title: 'Maintenance' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main flex-grow-1 p-3 p-md-4">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="h4 mb-0 fw-bold">Maintenance</h1>
+      </div>
+      <p class="text-body-secondary small">Reminders fire by date, by distance driven since the reminder was created, or both. Distance comes from the tracked path — no odometer wiring needed.</p>
+
+      <div class="card p-3 mb-3">
+        <div class="label text-uppercase text-body-secondary small fw-semibold mb-2">New reminder</div>
+        <div class="row g-2">
+          <div class="col-md-3">
+            <select class="form-select" id="m-vehicle">
+              <% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %>
+            </select>
+          </div>
+          <div class="col-md-3"><input class="form-control" id="m-title" placeholder="e.g. Oil change"></div>
+          <div class="col-md-2"><input class="form-control" id="m-date" type="date" title="Due date"></div>
+          <div class="col-md-2"><input class="form-control" id="m-km" type="number" min="1" placeholder="Due in km"></div>
+          <div class="col-md-2"><button class="btn btn-primary w-100" id="m-add">Add</button></div>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Vehicle</th><th>Task</th><th>Due date</th><th>Due km</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+              <% if (!items.length) { %><tr><td colspan="6"><div class="empty-state">No reminders yet.</div></td></tr><% } %>
+              <% items.forEach((m) => {
+                   const done = !!m.completed_at;
+                   const overdue = !done && m.due_date && new Date(m.due_date) <= new Date();
+              %>
+              <tr>
+                <td class="fw-semibold"><%= m.vehicle_name %></td>
+                <td><%= m.title %></td>
+                <td class="font-monospace small <%= overdue ? 'text-danger fw-semibold' : 'text-body-secondary' %>"><%= m.due_date ? String(m.due_date).slice(0,10) : '—' %></td>
+                <td class="font-monospace small text-body-secondary"><%= m.due_km ? Math.round(m.due_km) + ' km' : '—' %></td>
+                <td>
+                  <% if (done) { %><span class="badge text-bg-success">Done</span>
+                  <% } else if (overdue || m.notified_at) { %><span class="badge text-bg-danger">Due</span>
+                  <% } else { %><span class="badge text-bg-secondary">Scheduled</span><% } %>
+                </td>
+                <td class="text-end text-nowrap">
+                  <% if (!done) { %><button class="btn btn-sm btn-outline-success" data-done="<%= m.id %>">Mark done</button><% } %>
+                  <button class="btn btn-sm btn-outline-danger" data-del="<%= m.id %>">Delete</button>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+  <script>
+    $('#m-add').on('click', async function () {
+      try {
+        await api('/api/maintenance', { method: 'POST', body: {
+          vehicleId: $('#m-vehicle').val(), title: $('#m-title').val(),
+          dueDate: $('#m-date').val() || null,
+          dueKm: $('#m-km').val() ? Number($('#m-km').val()) : null,
+        }});
+        location.reload();
+      } catch (e) { showErr('.admin-main', e.message); }
+    });
+    $('[data-done]').on('click', async function () {
+      try { await api('/api/maintenance/' + this.dataset.done + '/complete', { method: 'POST' }); location.reload(); }
+      catch (e) { showErr('.admin-main', e.message); }
+    });
+    $('[data-del]').on('click', async function () {
+      try { await api('/api/maintenance/' + this.dataset.del, { method: 'DELETE' }); location.reload(); }
+      catch (e) { showErr('.admin-main', e.message); }
+    });
+  </script>
+</body>
+</html>

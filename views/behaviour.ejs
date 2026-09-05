@@ -1,0 +1,65 @@
+<%- include('partials/head', { title: 'Driver scores' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main flex-grow-1 p-3 p-md-4">
+      <h1 class="h4 fw-bold mb-1">Driver scores</h1>
+      <p class="text-body-secondary small">Harsh braking, acceleration and cornering are derived from consecutive GPS fixes. Scores start at 100 and are docked per harsh event per 100 km, so vehicles that cover more ground aren't penalised for it.</p>
+
+      <div class="card p-3 mb-3">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3"><label class="form-label small">From</label><input class="form-control" id="b-from" type="date"></div>
+          <div class="col-md-3"><label class="form-label small">To</label><input class="form-control" id="b-to" type="date"></div>
+          <div class="col-md-2"><button class="btn btn-primary w-100" id="b-run">Run</button></div>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0" id="b-table">
+            <thead><tr><th>Vehicle</th><th>Driver</th><th class="text-end">Distance</th><th class="text-end">Braking</th><th class="text-end">Accel</th><th class="text-end">Cornering</th><th class="text-end">Score</th></tr></thead>
+            <tbody><tr><td colspan="7"><div class="empty-state">Loading…</div></td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+  <script>
+    const iso = (d) => d.toISOString().slice(0, 10);
+    $('#b-to').val(iso(new Date()));
+    $('#b-from').val(iso(new Date(Date.now() - 7 * 864e5)));
+
+    function badge(score) {
+      const cls = score >= 85 ? 'text-bg-success' : score >= 60 ? 'text-bg-warning' : 'text-bg-danger';
+      return `<span class="badge ${cls} font-monospace">${score}</span>`;
+    }
+
+    async function load() {
+      const from = new Date($('#b-from').val()).toISOString();
+      const to = new Date($('#b-to').val() + 'T23:59:59').toISOString();
+      try {
+        const rows = await api(`/api/behaviour?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+        if (!rows.length) {
+          $('#b-table tbody').html('<tr><td colspan="7"><div class="empty-state">No vehicles in range.</div></td></tr>');
+          return;
+        }
+        $('#b-table tbody').html(rows.map((r) => `
+          <tr>
+            <td class="fw-semibold">${r.name}</td>
+            <td class="text-body-secondary small">${r.driver_name || '—'}</td>
+            <td class="text-end font-monospace">${r.km} km</td>
+            <td class="text-end font-monospace">${r.harsh_brakes}</td>
+            <td class="text-end font-monospace">${r.harsh_accels}</td>
+            <td class="text-end font-monospace">${r.harsh_turns}</td>
+            <td class="text-end">${badge(r.score)}</td>
+          </tr>`).join(''));
+      } catch (e) {
+        $('#b-table tbody').html(`<tr><td colspan="7"><div class="empty-state">${e.message}</div></td></tr>`);
+      }
+    }
+    $('#b-run').on('click', load);
+    load();
+  </script>
+</body>
+</html>

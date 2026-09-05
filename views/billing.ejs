@@ -2,24 +2,92 @@
   <%- include('partials/topbar') %>
   <div class="d-flex">
     <%- include('partials/nav', { active }) %>
-    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold">Billing & Invoices</h1>
+    <main class="admin-main flex-grow-1 p-3 p-md-4">
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <h1 class="h4 mb-0 fw-bold">Billing &amp; Invoices</h1>
+        <div class="d-flex gap-2">
+          <% if (user.role === 'super_admin') { %>
+          <a class="btn btn-sm btn-outline-secondary" href="/api/invoices?format=csv">Export CSV</a>
+          <% } %>
+          <button class="btn btn-sm btn-outline-primary" id="btn-preview">Preview current period</button>
+        </div>
       </div>
-      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/billing' }) %>
-      
+
+      <% if (summary) { %>
+      <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+          <div class="card kpi-card h-100 p-3">
+            <div class="label-sm text-uppercase text-body-secondary small fw-semibold">Outstanding</div>
+            <div class="kpi-value font-monospace"><%= money(summary.outstanding) %></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100 p-3" style="border-left: 4px solid var(--danger)">
+            <div class="label-sm text-uppercase text-body-secondary small fw-semibold">Overdue</div>
+            <div class="kpi-value font-monospace text-danger"><%= money(summary.overdue) %></div>
+            <div class="small text-body-secondary"><%= summary.overdue_count %> invoice<%= +summary.overdue_count === 1 ? '' : 's' %></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100 p-3" style="border-left: 4px solid var(--teal)">
+            <div class="label-sm text-uppercase text-body-secondary small fw-semibold">Collected this month</div>
+            <div class="kpi-value font-monospace text-success"><%= money(summary.collected_this_month) %></div>
+          </div>
+        </div>
+        <div class="col-6 col-lg-3">
+          <div class="card h-100 p-3" style="border-left: 4px solid var(--amber)">
+            <div class="label-sm text-uppercase text-body-secondary small fw-semibold">MRR</div>
+            <div class="kpi-value font-monospace"><%= money(summary.mrr) %></div>
+            <div class="small text-body-secondary">recurring, at current fleet size</div>
+          </div>
+        </div>
+      </div>
+      <% } %>
+
+      <div id="preview-box"></div>
+
       <div class="card overflow-hidden my-3">
+        <div class="card-header d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span class="fw-semibold">Invoices</span>
+          <input class="form-control form-control-sm table-search" data-table-filter="#inv-table" placeholder="Search…">
+        </div>
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
-            <thead><tr><th>Period</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
-            <tbody>
-              <% if (!invoices.length) { %><tr><td colspan="4" class="text-body-secondary py-4 text-center">No invoices generated yet.</td></tr><% } %>
-              <% invoices.forEach((i) => { %>
+          <table class="table table-hover align-middle mb-0" id="inv-table">
+            <thead>
               <tr>
-                <td class="font-monospace small text-body-secondary"><%= i.period_start %> → <%= i.period_end %></td>
-                <td class="font-monospace fw-semibold"><%= money(i.amount) %></td>
-                <td><%= i.status === 'paid' ? '<span class="badge text-bg-success bg-gradient">Paid</span>' : '<span class="badge text-bg-warning bg-gradient">Open</span>' %></td>
-                <td class="text-end"><% if (i.status === 'open') { %><button class="btn btn-sm btn-outline-secondary" data-pay="<%= i.id %>">Mark Paid</button><% } %></td>
+                <th>Invoice</th>
+                <% if (user.role === 'super_admin') { %><th>Customer</th><% } %>
+                <th>Period</th>
+                <th>Due</th>
+                <th class="text-end">Total</th>
+                <th class="text-end">Balance</th>
+                <th>Status</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!invoices.length) { %>
+              <tr><td colspan="<%= user.role === 'super_admin' ? 8 : 7 %>"><div class="empty-state">No invoices generated yet.</div></td></tr>
+              <% } %>
+              <% invoices.forEach((i) => {
+                   const bal = Number(i.balance != null ? i.balance : i.amount);
+                   const badge = { paid: 'text-bg-success', overdue: 'text-bg-danger', partial: 'text-bg-info', void: 'text-bg-secondary' }[i.status] || 'text-bg-warning';
+                   const overdue = i.status === 'overdue';
+              %>
+              <tr>
+                <td class="font-monospace small fw-semibold"><%= i.invoice_no || ('#' + i.id) %></td>
+                <% if (user.role === 'super_admin') { %><td><%= i.customer || '—' %></td><% } %>
+                <td class="font-monospace small text-body-secondary"><%= String(i.period_start).slice(0,10) %> → <%= String(i.period_end).slice(0,10) %></td>
+                <td class="font-monospace small <%= overdue ? 'text-danger fw-semibold' : 'text-body-secondary' %>"><%= i.due_date ? String(i.due_date).slice(0,10) : '—' %></td>
+                <td class="text-end font-monospace fw-semibold"><%= money(i.amount) %></td>
+                <td class="text-end font-monospace <%= bal > 0 ? '' : 'text-body-secondary' %>"><%= money(bal) %></td>
+                <td><span class="badge <%= badge %>"><%= i.status %></span></td>
+                <td class="text-end text-nowrap">
+                  <a class="btn btn-sm btn-outline-secondary" href="/admin/invoices/<%= i.id %>">View</a>
+                  <% if (i.status !== 'paid' && i.status !== 'void') { %>
+                  <button class="btn btn-sm btn-outline-primary" data-payopen="<%= i.id %>" data-bal="<%= bal %>" data-no="<%= i.invoice_no || i.id %>">Record payment</button>
+                  <% } %>
+                </td>
               </tr>
               <% }) %>
             </tbody>
@@ -29,11 +97,88 @@
       <div class="mt-3"><%- include('partials/pager', { page, pages, total, baseUrl: '/admin/billing' }) %></div>
     </main>
   </div>
+
+  <!-- record payment -->
+  <div class="modal fade" id="pay-modal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content border" style="background: var(--panel); border-radius: 14px;">
+        <div class="modal-body p-4">
+          <h2 class="h6 fw-semibold mb-3">Record payment — <span id="pay-no" class="font-monospace"></span></h2>
+          <div class="mb-3">
+            <label class="form-label small">Amount</label>
+            <input class="form-control" id="pay-amount" type="number" step="0.01" min="0.01">
+            <div class="form-text">Leave as-is to settle the full balance, or enter less for a partial payment.</div>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small">Method</label>
+              <select class="form-select" id="pay-method">
+                <option value="manual">Manual</option>
+                <option value="bank">Bank transfer</option>
+                <option value="cash">Cash</option>
+                <option value="card">Card</option>
+              </select>
+            </div>
+            <div class="col-6">
+              <label class="form-label small">Reference</label>
+              <input class="form-control" id="pay-ref" placeholder="TXN-1234">
+            </div>
+          </div>
+          <div class="d-flex gap-2 justify-content-end">
+            <button class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button class="btn btn-primary" id="pay-save">Record payment</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <%- include('partials/scripts') %>
   <script>
-    $('[data-pay]').on('click', async function () {
-      try { await api(`/api/invoices/${this.dataset.pay}/pay`, { method: 'POST' }); location.reload(); }
-      catch (err) { showErr('.admin-main', err.message); }
+    let payId = null;
+    const payModal = new bootstrap.Modal('#pay-modal');
+
+    $('[data-payopen]').on('click', function () {
+      payId = this.dataset.payopen;
+      $('#pay-no').text(this.dataset.no);
+      $('#pay-amount').val(this.dataset.bal);
+      payModal.show();
+    });
+
+    $('#pay-save').on('click', async function () {
+      try {
+        await api(`/api/invoices/${payId}/payments`, {
+          method: 'POST',
+          body: {
+            amount: Number($('#pay-amount').val()),
+            method: $('#pay-method').val(),
+            reference: $('#pay-ref').val() || null,
+          },
+        });
+        location.reload();
+      } catch (err) { showErr('.modal-body', err.message); }
+    });
+
+    $('#btn-preview').on('click', async function () {
+      try {
+        const p = await api('/api/billing/preview');
+        const rows = p.lines.map((l) => `<tr><td>${l.description}</td><td class="text-end font-monospace">${l.quantity} × ${l.unit_price}</td><td class="text-end font-monospace">${l.amount}</td></tr>`).join('');
+        $('#preview-box').html(`
+          <div class="card p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+              <span class="fw-semibold">Current period preview — ${p.vehicleCount} vehicles on ${p.plan.name}</span>
+              <button class="btn-close" id="preview-close" aria-label="Close"></button>
+            </div>
+            <div class="table-responsive"><table class="table table-sm mb-0">
+              <tbody>${rows}
+                <tr><td class="text-end text-body-secondary" colspan="2">Subtotal</td><td class="text-end font-monospace">${p.subtotal}</td></tr>
+                <tr><td class="text-end text-body-secondary" colspan="2">Tax (${p.taxRate}%)</td><td class="text-end font-monospace">${p.taxAmount}</td></tr>
+                <tr class="fw-bold"><td class="text-end" colspan="2">Total</td><td class="text-end font-monospace">${p.total}</td></tr>
+              </tbody>
+            </table></div>
+          </div>`);
+        $('#preview-close').on('click', () => $('#preview-box').empty());
+      } catch (err) { showErr('.admin-main', err.message); }
     });
   </script>
 </body>

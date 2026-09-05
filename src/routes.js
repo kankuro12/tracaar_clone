@@ -2,8 +2,10 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole, weakPassword, MIN_PASSWORD_LEN } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached, visibleVehicleIds } = require('./db');
 const { rateLimit } = require('./ratelimit');
+const { invalidateRules } = require('./rules');
+const { recordPayment, changePlanProrated, revenueSummary, previewInvoice } = require('./billing');
 
 const router = Router();
 
@@ -228,6 +230,7 @@ router.put('/alert-rules', auth, requireRole('admin'), async (req, res) => {
      ON CONFLICT (customer_id, type) DO UPDATE SET threshold = EXCLUDED.threshold, enabled = EXCLUDED.enabled`,
     [req.user.customerId, type, +threshold || 0, enabled !== false]
   );
+  invalidateRules(req.user.customerId); // ingest reads these per frame from a cache
   auditLog({ customerId: req.user.customerId, userId: req.user.id, action: 'alert_rule.upsert', meta: { type, threshold } });
   res.status(204).end();
 });
@@ -522,24 +525,233 @@ router.patch('/users/:id/password', auth, requireRole('admin'), async (req, res)
 });
 
 router.get('/invoices', auth, async (req, res) => {
+  const paidExpr = '(SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.invoice_id = i.id)';
   let rows;
   if (req.user.role === 'super_admin') {
-    rows = await pool.query('SELECT i.*, c.name AS customer FROM invoices i JOIN customers c ON c.id = i.customer_id ORDER BY i.period_end DESC LIMIT 500');
+    rows = await pool.query(
+      `SELECT i.*, c.name AS customer, ${paidExpr} AS paid_amount
+         FROM invoices i JOIN customers c ON c.id = i.customer_id
+        ORDER BY i.period_end DESC, i.id DESC LIMIT 500`);
   } else if (req.user.role === 'admin') {
-    rows = await pool.query('SELECT * FROM invoices WHERE customer_id = $1 ORDER BY period_end DESC', [req.user.customerId]);
+    rows = await pool.query(
+      `SELECT i.*, ${paidExpr} AS paid_amount FROM invoices i
+        WHERE i.customer_id = $1 ORDER BY i.period_end DESC, i.id DESC`,
+      [req.user.customerId]);
   } else {
     return res.status(403).json({ error: 'forbidden' });
   }
-  res.json(rows.rows);
+  res.json(rows.rows.map((r) => ({ ...r, balance: +(Number(r.amount) - Number(r.paid_amount)).toFixed(2) })));
 });
 
-router.post('/invoices/:id/pay', auth, async (req, res) => {
+// Single invoice with its line items and payment history.
+async function invoiceForUser(req, res) {
   const r = await pool.query('SELECT * FROM invoices WHERE id = $1', [req.params.id]);
   const inv = r.rows[0];
-  if (!inv) return res.status(404).json({ error: 'invoice not found' });
-  if (req.user.role === 'admin' && inv.customer_id !== req.user.customerId) return res.status(403).json({ error: 'forbidden' });
-  await pool.query("UPDATE invoices SET status = 'paid', paid_at = now() WHERE id = $1", [inv.id]);
-  res.json({ ...inv, status: 'paid', paid_at: new Date().toISOString() });
+  if (!inv) { res.status(404).json({ error: 'invoice not found' }); return null; }
+  if (req.user.role !== 'super_admin' && String(inv.customer_id) !== String(req.user.customerId)) {
+    res.status(403).json({ error: 'forbidden' });
+    return null;
+  }
+  return inv;
+}
+
+router.get('/invoices/:id', auth, async (req, res) => {
+  const inv = await invoiceForUser(req, res);
+  if (!inv) return;
+  const [lines, payments] = await Promise.all([
+    pool.query('SELECT * FROM invoice_lines WHERE invoice_id = $1 ORDER BY sort, id', [inv.id]),
+    pool.query('SELECT * FROM payments WHERE invoice_id = $1 ORDER BY paid_at DESC', [inv.id]),
+  ]);
+  const paid = payments.rows.reduce((s, p) => s + Number(p.amount), 0);
+  res.json({
+    ...inv,
+    lines: lines.rows,
+    payments: payments.rows,
+    paid_amount: +paid.toFixed(2),
+    balance: +(Number(inv.amount) - paid).toFixed(2),
+  });
+});
+
+// Record a payment (full or partial). Replaces the old "mark paid" flag flip.
+router.post('/invoices/:id/payments', auth, requireRole('admin', 'super_admin'), async (req, res) => {
+  const inv = await invoiceForUser(req, res);
+  if (!inv) return;
+  const { amount, method, reference, note } = req.body || {};
+  const result = await recordPayment({
+    invoiceId: inv.id,
+    amount: amount == null ? Number(inv.amount) : Number(amount),
+    method, reference, note,
+    userId: req.user.id,
+  });
+  if (result.error) return res.status(400).json({ error: result.error });
+  auditLog({ customerId: inv.customer_id, userId: req.user.id, action: 'invoice.payment', meta: { invoiceId: inv.id, amount: result.paid } });
+  res.json(result);
+});
+
+// Kept for older clients: pay the full remaining balance.
+router.post('/invoices/:id/pay', auth, async (req, res) => {
+  const inv = await invoiceForUser(req, res);
+  if (!inv) return;
+  const paidR = await pool.query('SELECT COALESCE(SUM(amount),0) AS paid FROM payments WHERE invoice_id = $1', [inv.id]);
+  const balance = Number(inv.amount) - Number(paidR.rows[0].paid);
+  const result = await recordPayment({ invoiceId: inv.id, amount: balance, method: 'manual', userId: req.user.id });
+  if (result.error) return res.status(400).json({ error: result.error });
+  res.json(result.invoice);
+});
+
+router.post('/invoices/:id/void', auth, requireRole('super_admin'), async (req, res) => {
+  const inv = await invoiceForUser(req, res);
+  if (!inv) return;
+  await pool.query("UPDATE invoices SET status = 'void', voided_at = now() WHERE id = $1", [inv.id]);
+  auditLog({ customerId: inv.customer_id, userId: req.user.id, action: 'invoice.void', meta: { invoiceId: inv.id } });
+  res.status(204).end();
+});
+
+// What the current period will cost, before it is invoiced.
+router.get('/billing/preview', auth, requireRole('admin', 'super_admin'), async (req, res) => {
+  const cid = req.user.role === 'super_admin' ? req.query.customerId : req.user.customerId;
+  if (!cid) return res.status(400).json({ error: 'customerId required' });
+  const preview = await previewInvoice(cid);
+  if (!preview) return res.status(404).json({ error: 'customer has no plan' });
+  res.json(preview);
+});
+
+router.get('/billing/summary', auth, requireRole('super_admin'), async (req, res) => {
+  res.json(await revenueSummary());
+});
+
+// Change a customer's plan, prorating the open invoice.
+router.post('/customers/:id/plan', auth, requireRole('super_admin'), async (req, res) => {
+  const { planId } = req.body || {};
+  if (!planId) return res.status(400).json({ error: 'planId required' });
+  const result = await changePlanProrated({ customerId: req.params.id, newPlanId: planId, userId: req.user.id });
+  if (result.error) return res.status(400).json({ error: result.error });
+  auditLog({ customerId: req.params.id, userId: req.user.id, action: 'customer.plan_change', meta: { planId, prorated: result.prorated } });
+  res.json(result);
+});
+
+// ---- Drivers ----
+router.get('/drivers', auth, requireRole('admin'), async (req, res) => {
+  const r = await pool.query(
+    `SELECT d.*, (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id) AS vehicle_count
+       FROM drivers d WHERE d.customer_id = $1 ORDER BY d.name`,
+    [req.user.customerId]);
+  res.json(r.rows);
+});
+
+router.post('/drivers', auth, requireRole('admin'), async (req, res) => {
+  const { name, licenseNo, phone, email } = req.body || {};
+  if (!name) return res.status(400).json({ error: 'name required' });
+  const r = await pool.query(
+    `INSERT INTO drivers (customer_id, name, license_no, phone, email)
+     VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+    [req.user.customerId, name, licenseNo || null, phone || null, email || null]);
+  res.status(201).json(r.rows[0]);
+});
+
+router.delete('/drivers/:id', auth, requireRole('admin'), async (req, res) => {
+  await pool.query('DELETE FROM drivers WHERE id = $1 AND customer_id = $2', [req.params.id, req.user.customerId]);
+  res.status(204).end();
+});
+
+// Assign a driver to a vehicle (null clears).
+router.patch('/vehicles/:id/driver', auth, requireRole('admin'), async (req, res) => {
+  const v = await tenantVehicle(req, res);
+  if (!v) return;
+  const { driverId } = req.body || {};
+  if (driverId) {
+    const d = await pool.query('SELECT 1 FROM drivers WHERE id = $1 AND customer_id = $2', [driverId, req.user.customerId]);
+    if (!d.rows.length) return res.status(404).json({ error: 'driver not found' });
+  }
+  await pool.query('UPDATE vehicles SET driver_id = $2 WHERE id = $1', [v.id, driverId || null]);
+  res.status(204).end();
+});
+
+// ---- Driver behaviour scoring ----
+// Score starts at 100 and is docked per harsh event per 100 km driven, so a
+// van that covers more ground isn't punished for it.
+router.get('/behaviour', auth, async (req, res) => {
+  const from = new Date(req.query.from || Date.now() - 7 * 24 * 3600 * 1000);
+  const to = new Date(req.query.to || Date.now());
+  const ids = await visibleVehicleIds(req.user);
+  if (!ids.size) return res.json([]);
+  const idList = [...ids].map(Number);
+  const r = await pool.query(
+    `WITH pts AS (
+       SELECT p.vehicle_id,
+              ST_Distance(p.point, LAG(p.point) OVER (PARTITION BY p.vehicle_id ORDER BY p.device_time)) AS dist_m
+         FROM positions p
+        WHERE p.vehicle_id = ANY($1::bigint[]) AND p.device_time >= $2 AND p.device_time <= $3 AND p.valid
+     ),
+     dist AS (
+       SELECT vehicle_id, COALESCE(SUM(dist_m),0)/1000.0 AS km FROM pts GROUP BY vehicle_id
+     ),
+     ev AS (
+       SELECT vehicle_id,
+              count(*) FILTER (WHERE type = 'harsh_brake') AS brakes,
+              count(*) FILTER (WHERE type = 'harsh_accel') AS accels,
+              count(*) FILTER (WHERE type = 'harsh_turn')  AS turns
+         FROM driving_events
+        WHERE vehicle_id = ANY($1::bigint[]) AND occurred_at >= $2 AND occurred_at <= $3
+        GROUP BY vehicle_id
+     )
+     SELECT v.id, v.name, v.plate, d.name AS driver_name,
+            COALESCE(dist.km,0) AS km,
+            COALESCE(ev.brakes,0) AS harsh_brakes,
+            COALESCE(ev.accels,0) AS harsh_accels,
+            COALESCE(ev.turns,0)  AS harsh_turns
+       FROM vehicles v
+       LEFT JOIN drivers d ON d.id = v.driver_id
+       LEFT JOIN dist ON dist.vehicle_id = v.id
+       LEFT JOIN ev   ON ev.vehicle_id = v.id
+      WHERE v.id = ANY($1::bigint[])
+      ORDER BY v.name`,
+    [idList, from, to]
+  );
+  res.json(r.rows.map((row) => {
+    const km = Number(row.km) || 0;
+    const events = Number(row.harsh_brakes) + Number(row.harsh_accels) + Number(row.harsh_turns);
+    const per100 = km > 1 ? (events / km) * 100 : events;
+    const score = Math.max(0, Math.min(100, Math.round(100 - per100 * 5)));
+    return { ...row, km: +km.toFixed(1), events, score };
+  }));
+});
+
+// ---- Maintenance reminders ----
+router.get('/maintenance', auth, requireRole('admin'), async (req, res) => {
+  const r = await pool.query(
+    `SELECT m.*, v.name AS vehicle_name FROM maintenance m
+       JOIN vehicles v ON v.id = m.vehicle_id
+      WHERE m.customer_id = $1
+      ORDER BY m.completed_at NULLS FIRST, m.due_date NULLS LAST, m.id DESC`,
+    [req.user.customerId]);
+  res.json(r.rows);
+});
+
+router.post('/maintenance', auth, requireRole('admin'), async (req, res) => {
+  const { vehicleId, title, dueDate, dueKm, notes } = req.body || {};
+  if (!vehicleId || !title) return res.status(400).json({ error: 'vehicleId and title required' });
+  if (!dueDate && !dueKm) return res.status(400).json({ error: 'set a due date, a due distance, or both' });
+  const v = await pool.query('SELECT 1 FROM vehicles WHERE id = $1 AND customer_id = $2', [vehicleId, req.user.customerId]);
+  if (!v.rows.length) return res.status(404).json({ error: 'vehicle not found' });
+  const r = await pool.query(
+    `INSERT INTO maintenance (customer_id, vehicle_id, title, due_date, due_km, notes)
+     VALUES ($1,$2,$3,$4,$5,$6) RETURNING *`,
+    [req.user.customerId, vehicleId, title, dueDate || null, dueKm || null, notes || null]);
+  res.status(201).json(r.rows[0]);
+});
+
+router.post('/maintenance/:id/complete', auth, requireRole('admin'), async (req, res) => {
+  const r = await pool.query(
+    'UPDATE maintenance SET completed_at = now() WHERE id = $1 AND customer_id = $2 RETURNING *',
+    [req.params.id, req.user.customerId]);
+  if (!r.rows.length) return res.status(404).json({ error: 'reminder not found' });
+  res.json(r.rows[0]);
+});
+
+router.delete('/maintenance/:id', auth, requireRole('admin'), async (req, res) => {
+  await pool.query('DELETE FROM maintenance WHERE id = $1 AND customer_id = $2', [req.params.id, req.user.customerId]);
+  res.status(204).end();
 });
 
 // ---- ERP / 3rd-party integration ----

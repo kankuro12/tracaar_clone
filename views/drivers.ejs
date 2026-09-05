@@ -1,0 +1,83 @@
+<%- include('partials/head', { title: 'Drivers' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main flex-grow-1 p-3 p-md-4">
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <h1 class="h4 mb-0 fw-bold">Drivers</h1>
+        <span class="badge text-bg-secondary px-3 py-2 font-monospace"><%= drivers.length %> total</span>
+      </div>
+
+      <div class="card p-3 mb-3">
+        <div class="label text-uppercase text-body-secondary small fw-semibold mb-2">New driver</div>
+        <div class="row g-2">
+          <div class="col-md-3"><input class="form-control" id="d-name" placeholder="Full name"></div>
+          <div class="col-md-3"><input class="form-control" id="d-license" placeholder="Licence no."></div>
+          <div class="col-md-2"><input class="form-control" id="d-phone" placeholder="Phone"></div>
+          <div class="col-md-2"><input class="form-control" id="d-email" placeholder="Email"></div>
+          <div class="col-md-2"><button class="btn btn-primary w-100" id="d-add">Add driver</button></div>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Name</th><th>Licence</th><th>Contact</th><th>Vehicles</th><th class="text-end">Actions</th></tr></thead>
+            <tbody>
+              <% if (!drivers.length) { %><tr><td colspan="5"><div class="empty-state">No drivers yet. Add one above, then assign vehicles.</div></td></tr><% } %>
+              <% drivers.forEach((d) => { %>
+              <tr>
+                <td class="fw-semibold"><%= d.name %></td>
+                <td class="font-monospace small"><%= d.license_no || '—' %></td>
+                <td class="small text-body-secondary"><%= [d.phone, d.email].filter(Boolean).join(' · ') || '—' %></td>
+                <td><span class="badge text-bg-secondary font-monospace"><%= d.vehicle_count %></span></td>
+                <td class="text-end"><button class="btn btn-sm btn-outline-danger" data-del="<%= d.id %>">Remove</button></td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card p-3 mt-3">
+        <div class="label text-uppercase text-body-secondary small fw-semibold mb-2">Vehicle assignment</div>
+        <div class="row g-2">
+          <% vehicles.forEach((v) => { %>
+          <div class="col-md-6 col-lg-4 d-flex align-items-center gap-2">
+            <span class="small fw-semibold flex-shrink-0" style="min-width: 120px"><%= v.name %></span>
+            <select class="form-select form-select-sm" data-assign="<%= v.id %>">
+              <option value="">— unassigned —</option>
+              <% drivers.forEach((d) => { %>
+              <option value="<%= d.id %>" <%= String(v.driver_id) === String(d.id) ? 'selected' : '' %>><%= d.name %></option>
+              <% }) %>
+            </select>
+          </div>
+          <% }) %>
+          <% if (!vehicles.length) { %><div class="col-12 text-body-secondary small">No vehicles registered.</div><% } %>
+        </div>
+      </div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+  <script>
+    $('#d-add').on('click', async function () {
+      try {
+        await api('/api/drivers', { method: 'POST', body: {
+          name: $('#d-name').val(), licenseNo: $('#d-license').val(),
+          phone: $('#d-phone').val(), email: $('#d-email').val(),
+        }});
+        location.reload();
+      } catch (e) { showErr('.admin-main', e.message); }
+    });
+    $('[data-del]').on('click', async function () {
+      if (!confirm('Remove this driver? Vehicles keep their history but become unassigned.')) return;
+      try { await api('/api/drivers/' + this.dataset.del, { method: 'DELETE' }); location.reload(); }
+      catch (e) { showErr('.admin-main', e.message); }
+    });
+    $('[data-assign]').on('change', async function () {
+      try { await api('/api/vehicles/' + this.dataset.assign + '/driver', { method: 'PATCH', body: { driverId: this.value || null } }); }
+      catch (e) { showErr('.admin-main', e.message); }
+    });
+  </script>
+</body>
+</html>

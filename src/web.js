@@ -6,6 +6,7 @@ const bcrypt = require('bcryptjs');
 const { pool, latestPositions, canSeeVehicle } = require('./db');
 const { sign } = require('./auth');
 const { rateLimit } = require('./ratelimit');
+const { revenueSummary } = require('./billing');
 
 const router = Router();
 const PER_PAGE = 25;
@@ -25,6 +26,9 @@ const NAV = {
     ['/portal/alerts', 'Alerts'],
     ['/portal/reports', 'Reports'],
     ['/admin/vehicles', 'Vehicles'],
+    ['/admin/drivers', 'Drivers'],
+    ['/admin/behaviour', 'Driver scores'],
+    ['/admin/maintenance', 'Maintenance'],
     ['/admin/geofences', 'Geofences'],
     ['/admin/billing', 'Billing'],
     ['/admin/integration', 'Integration'],
@@ -251,26 +255,80 @@ router.get('/admin/:page', loadUser, async (req, res) => {
     ]);
     return res.render('integration', { keys: keys.rows, vehicles: vehicles.rows, active: page });
   }
+  if (page === 'drivers') {
+    const [drivers, vehicles] = await Promise.all([
+      pool.query(`SELECT d.*, (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id) AS vehicle_count
+                    FROM drivers d WHERE d.customer_id = $1 ORDER BY d.name`, [req.user.customerId]),
+      pool.query('SELECT id, name, driver_id FROM vehicles WHERE customer_id = $1 ORDER BY name', [req.user.customerId]),
+    ]);
+    return res.render('drivers', { drivers: drivers.rows, vehicles: vehicles.rows, active: page });
+  }
+  if (page === 'maintenance') {
+    const [items, vehicles] = await Promise.all([
+      pool.query(`SELECT m.*, v.name AS vehicle_name FROM maintenance m
+                    JOIN vehicles v ON v.id = m.vehicle_id
+                   WHERE m.customer_id = $1
+                   ORDER BY (m.completed_at IS NOT NULL), m.due_date NULLS LAST, m.id DESC`, [req.user.customerId]),
+      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 ORDER BY name', [req.user.customerId]),
+    ]);
+    return res.render('maintenance', { items: items.rows, vehicles: vehicles.rows, active: page });
+  }
   if (page === 'billing' || page === 'invoices') {
     const q = pageQuery(req);
-    let rows, count;
+    const paidExpr = '(SELECT COALESCE(SUM(p.amount),0) FROM payments p WHERE p.invoice_id = i.id)';
+    let rows, count, summary = null;
     if (req.user.role === 'super_admin') {
-      [rows, count] = await Promise.all([
-        pool.query('SELECT i.*, c.name AS customer FROM invoices i JOIN customers c ON c.id = i.customer_id ORDER BY i.period_end DESC LIMIT $1 OFFSET $2', [q.per, q.offset]),
+      [rows, count, summary] = await Promise.all([
+        pool.query(`SELECT i.*, c.name AS customer, ${paidExpr} AS paid_amount
+                      FROM invoices i JOIN customers c ON c.id = i.customer_id
+                     ORDER BY i.period_end DESC, i.id DESC LIMIT $1 OFFSET $2`, [q.per, q.offset]),
         pool.query('SELECT count(*) FROM invoices'),
+        revenueSummary().catch(() => null),
       ]);
     } else {
       [rows, count] = await Promise.all([
-        pool.query('SELECT * FROM invoices WHERE customer_id = $1 ORDER BY period_end DESC LIMIT $2 OFFSET $3', [req.user.customerId, q.per, q.offset]),
+        pool.query(`SELECT i.*, ${paidExpr} AS paid_amount FROM invoices i
+                     WHERE i.customer_id = $1 ORDER BY i.period_end DESC, i.id DESC LIMIT $2 OFFSET $3`,
+        [req.user.customerId, q.per, q.offset]),
         pool.query('SELECT count(*) FROM invoices WHERE customer_id = $1', [req.user.customerId]),
       ]);
     }
     const total = +count.rows[0].count;
+    const invoices = rows.rows.map((r) => ({ ...r, balance: +(Number(r.amount) - Number(r.paid_amount || 0)).toFixed(2) }));
     return res.render(page === 'invoices' ? 'invoices' : 'billing', {
-      invoices: rows.rows, page: q.page, pages: Math.ceil(total / q.per), total, active: page,
+      invoices, summary, page: q.page, pages: Math.ceil(total / q.per), total, active: page,
     });
   }
   res.status(404).render('error', { message: 'page not found' });
+});
+
+// ---- single invoice ----
+router.get('/admin/invoices/:id', loadUser, rolePage('admin', 'super_admin'), async (req, res) => {
+  const r = await pool.query(
+    `SELECT i.*, c.name AS customer, c.billing_email FROM invoices i
+       JOIN customers c ON c.id = i.customer_id WHERE i.id = $1`, [req.params.id]);
+  const inv = r.rows[0];
+  if (!inv) return res.status(404).render('error', { message: 'invoice not found' });
+  if (req.user.role !== 'super_admin' && String(inv.customer_id) !== String(req.user.customerId)) {
+    return res.status(403).render('error', { message: 'forbidden' });
+  }
+  const [lines, payments] = await Promise.all([
+    pool.query('SELECT * FROM invoice_lines WHERE invoice_id = $1 ORDER BY sort, id', [inv.id]),
+    pool.query(`SELECT p.*, u.name AS by_name FROM payments p
+                  LEFT JOIN users u ON u.id = p.recorded_by
+                 WHERE p.invoice_id = $1 ORDER BY p.paid_at DESC`, [inv.id]),
+  ]);
+  const paid = payments.rows.reduce((s, p) => s + Number(p.amount), 0);
+  res.render('invoice', {
+    invoice: inv, lines: lines.rows, payments: payments.rows,
+    paid: +paid.toFixed(2), balance: +(Number(inv.amount) - paid).toFixed(2),
+    active: req.user.role === 'super_admin' ? 'invoices' : 'billing',
+  });
+});
+
+// ---- driver behaviour ----
+router.get('/admin/behaviour', loadUser, rolePage('admin', 'super_admin'), async (req, res) => {
+  res.render('behaviour', { active: 'behaviour', token: req.session.token });
 });
 
 // ---- vehicle position history (paged) ----

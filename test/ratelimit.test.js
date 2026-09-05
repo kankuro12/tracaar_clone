@@ -10,36 +10,40 @@ function fakeRes() {
   return res;
 }
 
-test('allows requests under the limit', () => {
+// The limiter resolves through the store (a promise), so each hit is awaited.
+function hit(limit, ip) {
+  return new Promise((resolve) => {
+    const res = fakeRes();
+    let passed = false;
+    const done = () => resolve({ res, passed });
+    res.json = (body) => { res.body = body; done(); return res; };
+    limit({ ip }, res, () => { passed = true; done(); });
+  });
+}
+
+test('allows requests under the limit', async () => {
   const limit = rateLimit({ windowMs: 60_000, max: 3, keyFn: () => 'a' });
   for (let i = 0; i < 3; i++) {
-    const res = fakeRes();
-    let nextCalled = false;
-    limit({ ip: '1.1.1.1' }, res, () => { nextCalled = true; });
-    assert.strictEqual(nextCalled, true);
+    const { res, passed } = await hit(limit, '1.1.1.1');
+    assert.strictEqual(passed, true);
     assert.strictEqual(res.statusCode, 200);
   }
 });
 
-test('blocks once the limit is exceeded', () => {
+test('blocks once the limit is exceeded', async () => {
   const limit = rateLimit({ windowMs: 60_000, max: 2, keyFn: () => 'b' });
-  for (let i = 0; i < 2; i++) limit({ ip: '1.1.1.1' }, fakeRes(), () => {});
-  const res = fakeRes();
-  let nextCalled = false;
-  limit({ ip: '1.1.1.1' }, res, () => { nextCalled = true; });
-  assert.strictEqual(nextCalled, false);
+  await hit(limit, '1.1.1.1');
+  await hit(limit, '1.1.1.1');
+  const { res, passed } = await hit(limit, '1.1.1.1');
+  assert.strictEqual(passed, false);
   assert.strictEqual(res.statusCode, 429);
   assert.ok(res.headers['Retry-After'] > 0);
 });
 
-test('separate keys get separate budgets', () => {
+test('separate keys get separate budgets', async () => {
   const limit = rateLimit({ windowMs: 60_000, max: 1, keyFn: (req) => req.ip });
-  const res1 = fakeRes();
-  let ok1 = false;
-  limit({ ip: '1.1.1.1' }, res1, () => { ok1 = true; });
-  const res2 = fakeRes();
-  let ok2 = false;
-  limit({ ip: '2.2.2.2' }, res2, () => { ok2 = true; });
-  assert.strictEqual(ok1, true);
-  assert.strictEqual(ok2, true);
+  const a = await hit(limit, '1.1.1.1');
+  const b = await hit(limit, '2.2.2.2');
+  assert.strictEqual(a.passed, true);
+  assert.strictEqual(b.passed, true);
 });

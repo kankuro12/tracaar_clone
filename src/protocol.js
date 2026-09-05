@@ -20,6 +20,50 @@ function combineDate(ddmmyy, hhmmss) {
   return new Date(Date.UTC(2000 + yy, mm - 1, dd, hh, mi, ss));
 }
 
+// ---- vehicle status word (field 12) ------------------------------------
+// Four bytes of flags. The protocol uses NEGATIVE logic: a bit reads 0 when
+// the condition is active. Bit 10 is documented as "ACC off", so ignition is
+// on when bit 10 is 0. (Traccar reads this bit the other way round, which is
+// why its H02 ignition reports are a long-running complaint — if your devices
+// disagree, flip H02_IGNITION_INVERT.)
+//
+// The raw word is kept alongside the decoded flags so a wrong mapping can be
+// re-derived later without having lost anything.
+const IGNITION_INVERT = process.env.H02_IGNITION_INVERT === '1';
+
+const BIT = {
+  theft: 0,          // illegal door open / thief
+  robbery: 1,        // SOS / rob
+  overspeed: 2,      // device-side speed alarm
+  illegalIgnition: 3,
+  gpsAntennaCut: 4,
+  doorOpen: 8,
+  armed: 9,
+  accOff: 10,        // negative logic: 0 => ignition ON
+  batteryRemoved: 20,
+  mainPowerOff: 28,
+};
+
+// active when the bit is 0 (negative logic)
+const active = (status, bit) => ((status >>> bit) & 1) === 0;
+
+function decodeStatus(hex) {
+  if (!hex || !/^[0-9a-fA-F]{1,8}$/.test(hex)) return null;
+  const status = parseInt(hex, 16) >>> 0;
+  const accOn = active(status, BIT.accOff);
+  return {
+    status,
+    statusHex: hex.toUpperCase(),
+    ignition: IGNITION_INVERT ? !accOn : accOn,
+    sos: active(status, BIT.robbery),
+    theft: active(status, BIT.theft),
+    deviceOverspeed: active(status, BIT.overspeed),
+    doorOpen: active(status, BIT.doorOpen),
+    armed: active(status, BIT.armed),
+    powerCut: active(status, BIT.mainPowerOff) || active(status, BIT.batteryRemoved),
+  };
+}
+
 /**
  * Parse one raw H02 frame into a position record.
  * Throws on malformed input — caller logs and discards.
@@ -34,6 +78,8 @@ function parseFrame(raw) {
   const lat = nmeaToDec(f[5], f[6]);
   const lon = nmeaToDec(f[7], f[8]);
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) throw new Error('coordinate out of range');
+  // f[12] is the status word on standard frames; absent on some trimmed variants
+  const st = decodeStatus(f[12]);
   return {
     imei,
     valid: f[4] === 'A',
@@ -42,8 +88,12 @@ function parseFrame(raw) {
     speedKn: parseFloat(f[9]) || 0,
     course: parseFloat(f[10]) || 0,
     deviceTime: combineDate(f[11], f[3]),
+    status: st ? st.status : null,
+    statusHex: st ? st.statusHex : null,
+    ignition: st ? st.ignition : null,
+    flags: st,
     raw,
   };
 }
 
-module.exports = { parseFrame };
+module.exports = { parseFrame, decodeStatus, BIT };
