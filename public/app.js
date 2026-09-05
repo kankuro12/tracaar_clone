@@ -71,12 +71,22 @@ function renderSidebar() {
         <div class="row-name">${escapeHtml(v.name)}</div>
         <div class="row-meta">
           <span>${v.position ? `${kmh(v.position.speedKn)} km/h` : '—'}</span>
+          ${ignitionTag(v.position ? v.position.ignition : null)}
           <span class="${online ? '' : 'stale'}">${v.position ? timeSince(v.position.recordedAt) : 'no data'}</span>
         </div>
       </div>`;
     row.addEventListener('click', () => toggleSelect(v.id));
     list.appendChild(row);
   }
+}
+
+// Ignition (ACC) from the device status word. null means the device didn't
+// report it, which is shown as its own state rather than as "off".
+function ignitionTag(ignition) {
+  if (ignition === null || ignition === undefined) return '';
+  return ignition
+    ? '<span class="ign on" title="Ignition on">IGN</span>'
+    : '<span class="ign off" title="Ignition off">IGN</span>';
 }
 
 function escapeHtml(s) {
@@ -178,6 +188,11 @@ function popupHtml(v) {
   else rows.push('<span class="offline-tag">STALE</span>');
   rows.push(`${fmt(v.position.lat)}°, ${fmt(v.position.lon)}°`);
   rows.push(`${kmh(v.position.speedKn)} km/h`);
+  if (v.position.ignition != null) {
+    rows.push(v.position.ignition
+      ? '<span class="online-tag">IGNITION ON</span>'
+      : '<span class="offline-tag">IGNITION OFF</span>');
+  }
   rows.push(`${timeSince(v.position.recordedAt)} ago`);
   if (v.plate) rows.push(escapeHtml(v.plate));
   if (v.destination && v.position) rows.push(`ETA ${etaMin(v.position, v.destination)} min`);

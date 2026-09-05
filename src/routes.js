@@ -109,6 +109,7 @@ router.get('/vehicles', auth, async (req, res) => {
     position: r.position_id ? {
       id: r.position_id, recordedAt: r.recorded_at, deviceTime: r.device_time,
       valid: r.valid, lat: r.lat, lon: r.lon, speedKn: r.speed_kn, course: r.course,
+      ignition: r.ignition, statusHex: r.status_hex,
     } : null,
   })));
 });

@@ -84,7 +84,7 @@ async function latestPositions(user) {
   const r = await pool.query(
     `SELECT DISTINCT ON (v.id)
        v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
-       p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
+       p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course, p.ignition, p.status_hex
      FROM vehicles v
      LEFT JOIN positions p ON p.vehicle_id = v.id
      ${scope.sql}

@@ -694,3 +694,25 @@ a { color: var(--primary); }
     height: 55vh;
   }
 }
+
+/* ---------- ignition tag (map sidebar rows) ---------- */
+.row-meta .ign {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 0 4px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  line-height: 1.5;
+}
+.row-meta .ign.on { color: var(--amber); }
+.row-meta .ign.off { color: var(--faint); }
+
+/* ---------- dashboard live vehicle cards ---------- */
+.vehicle-card { transition: box-shadow .2s ease, transform .2s ease; }
+.vehicle-card:hover { box-shadow: var(--shadow-lg); transform: translateY(-2px); }
+.vehicle-card.just-updated { box-shadow: 0 0 0 2px var(--primary), var(--shadow-md); }
+.vehicle-card .min-w-0 { min-width: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-card, .vehicle-card:hover { transition: none; transform: none; }
+}

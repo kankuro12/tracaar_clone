@@ -1,5 +1,5 @@
 <%- include('partials/head', { title: 'Overview' }) %>
-<%- include('partials/topbar') %>
+<%- include('partials/topbar', { showLive: true }) %>
 <div class="d-flex">
 <%- include('partials/nav', { active }) %>
 <main class="admin-main flex-grow-1 p-3 p-md-4">
@@ -7,30 +7,155 @@
     <h1 class="h4 mb-0 fw-bold">Fleet overview</h1>
     <a class="btn btn-sm btn-primary" href="/app">Open live map</a>
   </div>
-  <div class="row g-3 mb-3">
-    <div class="col-md-4"><div class="card kpi-card p-3"><div class="text-body-secondary small">Vehicles</div><div class="kpi-value"><%= vehicles.length %></div></div></div>
-    <div class="col-md-4"><div class="card kpi-card p-3" style="border-color:var(--teal)"><div class="text-body-secondary small">Online</div><div class="kpi-value text-success"><%= online %></div></div></div>
-    <div class="col-md-4"><div class="card kpi-card p-3" style="border-color:var(--danger)"><div class="text-body-secondary small">Offline</div><div class="kpi-value text-danger"><%= offline %></div></div></div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-md-3"><div class="card kpi-card p-3"><div class="text-body-secondary small">Vehicles</div><div class="kpi-value"><%= vehicles.length %></div></div></div>
+    <div class="col-6 col-md-3"><div class="card kpi-card p-3" style="border-left-color:var(--teal)"><div class="text-body-secondary small">Online</div><div class="kpi-value text-success" id="kpi-online"><%= online %></div></div></div>
+    <div class="col-6 col-md-3"><div class="card kpi-card p-3" style="border-left-color:var(--danger)"><div class="text-body-secondary small">Offline</div><div class="kpi-value text-danger" id="kpi-offline"><%= offline %></div></div></div>
+    <div class="col-6 col-md-3"><div class="card kpi-card p-3" style="border-left-color:var(--amber)"><div class="text-body-secondary small">Ignition on</div><div class="kpi-value" id="kpi-ignition">—</div></div></div>
   </div>
-  <div class="card overflow-hidden mb-3">
-    <div class="card-header d-flex justify-content-between align-items-center"><strong>Fleet status</strong><input class="form-control form-control-sm table-search" data-table-filter="#fleet-table" placeholder="Search vehicles…"></div>
-    <div class="table-responsive"><table class="table table-hover align-middle mb-0" id="fleet-table">
-      <thead><tr><th>Vehicle</th><th>Plate</th><th>Status</th><th>Speed</th><th>Last seen</th><th class="text-end">Open</th></tr></thead>
-      <tbody>
-      <% if (!vehicles.length) { %><tr><td colspan="6"><div class="empty-state">No vehicles assigned yet.</div></td></tr><% } %>
-      <% vehicles.forEach((v) => { const on = v.recorded_at && (Date.now() - new Date(v.recorded_at).getTime() < 180000); %>
-      <tr><td class="fw-semibold"><%= v.name %></td><td class="font-monospace small"><%= v.plate || '—' %></td>
-      <td><span class="badge <%= on ? 'text-bg-success' : 'text-bg-secondary' %>"><%= on ? 'online' : 'offline' %></span></td>
-      <td class="font-monospace small"><%= v.speed_kn != null ? Math.round(v.speed_kn * 1.852) + ' km/h' : '—' %></td>
-      <td class="font-monospace small text-body-secondary"><%= fmtDT(v.recorded_at) %></td>
-      <td class="text-end"><a class="btn btn-sm btn-outline-primary" href="/portal/trips?vehicleId=<%= v.id %>">Trips</a></td></tr>
-      <% }) %></tbody>
-    </table></div>
+
+  <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+    <strong>Live vehicles</strong>
+    <input class="form-control form-control-sm table-search" id="card-search" placeholder="Search vehicles…">
   </div>
+
+  <div class="row g-3 mb-4" id="vehicle-cards">
+    <% if (!vehicles.length) { %>
+    <div class="col-12"><div class="card"><div class="empty-state">No vehicles assigned yet.</div></div></div>
+    <% } %>
+    <% vehicles.forEach((v) => {
+         const on = v.recorded_at && (Date.now() - new Date(v.recorded_at).getTime() < 180000);
+         const kmh = v.speed_kn != null ? Math.round(v.speed_kn * 1.852) : null;
+    %>
+    <div class="col-12 col-md-6 col-xl-4 vehicle-card-col" data-name="<%= (v.name + ' ' + (v.plate || '')).toLowerCase() %>">
+      <div class="card h-100 p-3 vehicle-card" data-vid="<%= v.id %>">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="min-w-0">
+            <div class="fw-semibold text-truncate"><%= v.name %></div>
+            <div class="font-monospace small text-body-secondary"><%= v.plate || '—' %></div>
+          </div>
+          <div class="d-flex flex-column align-items-end gap-1">
+            <span class="badge <%= on ? 'text-bg-success' : 'text-bg-secondary' %>" data-f="status"><%= on ? 'online' : 'offline' %></span>
+            <%- include('partials/ignition', { ignition: v.ignition }) %>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-baseline gap-2 mb-2">
+          <span class="speed-display" data-f="speed" style="font-size:1.9rem"><%= kmh != null ? kmh : '—' %></span>
+          <span class="text-body-secondary small">km/h</span>
+        </div>
+
+        <div class="row g-2 small">
+          <div class="col-6">
+            <div class="text-body-secondary" style="font-size:11px">Position</div>
+            <div class="font-monospace" style="font-size:11.5px" data-f="pos"><%= v.lat != null ? Number(v.lat).toFixed(5) + ', ' + Number(v.lon).toFixed(5) : '—' %></div>
+          </div>
+          <div class="col-6">
+            <div class="text-body-secondary" style="font-size:11px">Heading</div>
+            <div class="font-monospace" style="font-size:11.5px" data-f="course"><%= v.course != null ? Math.round(v.course) + '°' : '—' %></div>
+          </div>
+          <div class="col-12">
+            <div class="text-body-secondary" style="font-size:11px">Last fix</div>
+            <div class="font-monospace" style="font-size:11.5px" data-f="seen"><%= fmtDT(v.device_time || v.recorded_at) %></div>
+          </div>
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+          <a class="btn btn-sm btn-outline-primary flex-grow-1" href="/admin/vehicles/<%= v.id %>/live">Live</a>
+          <a class="btn btn-sm btn-outline-secondary flex-grow-1" href="/portal/trips?vehicleId=<%= v.id %>">Trips</a>
+        </div>
+      </div>
+    </div>
+    <% }) %>
+  </div>
+
   <div class="card"><div class="card-header"><strong>Recent alerts</strong></div>
-    <div class="list-group list-group-flush"><% if (!alerts.length) { %><div class="empty-state">No alerts.</div><% } %>
-    <% alerts.forEach((a) => { %><div class="list-group-item d-flex justify-content-between"><span><%= a.message %></span><span class="font-monospace small text-body-secondary"><%= fmtDT(a.created_at) %></span></div><% }) %></div>
+    <div class="list-group list-group-flush" id="alert-list"><% if (!alerts.length) { %><div class="empty-state">No alerts.</div><% } %>
+    <% alerts.forEach((a) => { %><div class="list-group-item d-flex justify-content-between gap-2"><span><%= a.message %></span><span class="font-monospace small text-body-secondary"><%= fmtDT(a.created_at) %></span></div><% }) %></div>
   </div>
 </main></div>
 <%- include('partials/scripts') %>
+<script>window.FLEET = { user: <%- JSON.stringify(user) %>, token: <%- JSON.stringify(token) %> };</script>
+<script>
+  // Live updates: same websocket the map uses. Cards patch in place.
+  const fmtTime = (d) => new Date(d).toLocaleString();
+
+  function ignitionHtml(ign) {
+    if (ign === null || ign === undefined) return '<span class="badge text-bg-light border text-body-secondary" title="Device did not report ignition">ign n/a</span>';
+    return ign
+      ? '<span class="badge text-bg-warning">ignition on</span>'
+      : '<span class="badge text-bg-secondary">ignition off</span>';
+  }
+
+  function recount() {
+    const cards = [...document.querySelectorAll('.vehicle-card')];
+    const online = cards.filter((c) => c.querySelector('[data-f=status]').textContent.trim() === 'online').length;
+    const ign = cards.filter((c) => c.querySelector('[data-f=ignition]') && c.querySelector('[data-f=ignition]').dataset.on === '1').length;
+    document.getElementById('kpi-online').textContent = online;
+    document.getElementById('kpi-offline').textContent = cards.length - online;
+    document.getElementById('kpi-ignition').textContent = ign;
+  }
+
+  function applyPosition(vid, p) {
+    const card = document.querySelector(`.vehicle-card[data-vid="${vid}"]`);
+    if (!card) return;
+    const set = (f, val) => { const el = card.querySelector(`[data-f=${f}]`); if (el) el.textContent = val; };
+    set('speed', p.speedKn != null ? Math.round(p.speedKn * 1.852) : '—');
+    set('pos', p.lat != null ? Number(p.lat).toFixed(5) + ', ' + Number(p.lon).toFixed(5) : '—');
+    set('course', p.course != null ? Math.round(p.course) + '°' : '—');
+    set('seen', fmtTime(p.deviceTime || p.recordedAt));
+    const st = card.querySelector('[data-f=status]');
+    st.textContent = 'online';
+    st.className = 'badge text-bg-success';
+    const slot = card.querySelector('[data-f=ignition]');
+    if (slot) {
+      slot.outerHTML = ignitionHtml(p.ignition).replace('<span ', `<span data-f="ignition" data-on="${p.ignition ? 1 : 0}" `);
+    }
+    card.classList.add('just-updated');
+    setTimeout(() => card.classList.remove('just-updated'), 900);
+    recount();
+  }
+
+  (function connect() {
+    if (!window.FLEET || !window.FLEET.token) return;
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    const ws = new WebSocket(`${proto}://${location.host}/ws?token=${encodeURIComponent(window.FLEET.token)}`);
+    ws.onmessage = (ev) => {
+      let m; try { m = JSON.parse(ev.data); } catch { return; }
+      if (m.type === 'position') applyPosition(m.vehicleId, m.position);
+      if (m.type === 'alert' && m.alert) {
+        const list = document.getElementById('alert-list');
+        const row = document.createElement('div');
+        row.className = 'list-group-item d-flex justify-content-between gap-2';
+        row.innerHTML = `<span>${m.alert.message}</span><span class="font-monospace small text-body-secondary">${fmtTime(m.alert.created_at)}</span>`;
+        list.prepend(row);
+      }
+    };
+    ws.onclose = () => setTimeout(connect, 5000);
+  })();
+
+  // Stale vehicles drift back to offline without needing a reload.
+  setInterval(() => {
+    document.querySelectorAll('.vehicle-card').forEach((card) => {
+      const seen = card.querySelector('[data-f=seen]').textContent;
+      const t = Date.parse(seen);
+      if (!isNaN(t) && Date.now() - t > 180000) {
+        const st = card.querySelector('[data-f=status]');
+        st.textContent = 'offline';
+        st.className = 'badge text-bg-secondary';
+      }
+    });
+    recount();
+  }, 30000);
+
+  document.getElementById('card-search').addEventListener('input', function () {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.vehicle-card-col').forEach((c) => {
+      c.hidden = q && !c.dataset.name.includes(q);
+    });
+  });
+
+  recount();
+</script>
 </body></html>

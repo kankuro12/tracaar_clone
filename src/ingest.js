@@ -95,6 +95,8 @@ function startIngest({ port, hub, log = console.log }) {
       lon: position.lon,
       speedKn: position.speed_kn,
       course: position.course,
+      ignition: position.ignition,
+      statusHex: position.status_hex,
     };
     hub.publish(vehicle.id, { type: 'position', vehicleId: vehicle.id, position: payload });
 

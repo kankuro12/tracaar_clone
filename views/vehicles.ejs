@@ -41,6 +41,7 @@
               <tr>
                 <th>Name</th>
                 <th>Plate</th>
+                <th>Status</th>
                 <th>IMEI</th>
                 <th>Destination</th>
                 <th>Assigned Users</th>
@@ -49,12 +50,13 @@
             </thead>
             <tbody>
               <% if (!vehicles.length) { %>
-              <tr><td colspan="6" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
+              <tr><td colspan="7" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
               <% } %>
               <% vehicles.forEach((v) => { %>
               <tr>
                 <td class="fw-semibold"><%= v.name %></td>
                 <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= v.plate || '—' %></span></td>
+                <td><%- include('partials/ignition', { ignition: v.ignition }) %></td>
                 <td class="font-monospace small text-body-secondary"><%= v.imei %></td>
                 <td class="font-monospace small"><%= v.destination ? `${v.destination.lat.toFixed(5)}, ${v.destination.lon.toFixed(5)}` : '—' %></td>
                 <td>
