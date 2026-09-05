@@ -4,7 +4,7 @@
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">Subscription Plans</h1>
+        <h1 class="h4 mb-0 fw-bold">Subscription Plans</h1>
         <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= plans.length %> Active</span>
       </div>
 
@@ -43,7 +43,7 @@
             <tbody>
               <% plans.forEach((p) => { %>
               <tr>
-                <td class="fw-semibold text-white"><%= p.name %></td>
+                <td class="fw-semibold"><%= p.name %></td>
                 <td class="font-monospace text-emerald"><%= money(p.price_monthly) %></td>
                 <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= p.max_vehicles < 0 ? 'unlimited' : p.max_vehicles %></span></td>
               </tr>

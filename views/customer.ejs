@@ -3,11 +3,11 @@
   <div class="d-flex">
     <%- include('partials/nav', { active: 'customers' }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
-      <a class="btn btn-sm btn-outline-light mb-3 d-inline-flex align-items-center gap-1" href="/admin/customers">
+      <a class="btn btn-sm btn-outline-secondary mb-3 d-inline-flex align-items-center gap-1" href="/admin/customers">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
         All Customers
       </a>
-      <h1 class="h4 mb-4 fw-bold text-white"><%= customer.name %></h1>
+      <h1 class="h4 mb-4 fw-bold"><%= customer.name %></h1>
       
       <div class="row g-4">
         <div class="col-lg-6">
@@ -28,7 +28,7 @@
                     <% vehicles.forEach((v) => { %>
                     <tr>
                       <td class="font-monospace small text-body-secondary"><%= v.id %></td>
-                      <td class="fw-semibold text-white"><%= v.name %></td>
+                      <td class="fw-semibold"><%= v.name %></td>
                       <td class="font-monospace small"><%= v.imei %></td>
                       <td class="font-monospace small"><%= v.plate || '—' %></td>
                       <td class="font-monospace small text-body-secondary"><%= fmtDT(v.last_reported) %></td>
@@ -63,12 +63,12 @@
                     <% users.forEach((u) => { %>
                     <tr>
                       <td class="font-monospace small text-body-secondary"><%= u.id %></td>
-                      <td class="fw-semibold text-white"><%= u.name %></td>
+                      <td class="fw-semibold"><%= u.name %></td>
                       <td class="font-monospace small text-body-secondary"><%= u.email %></td>
                       <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace text-uppercase" style="font-size: 10px;"><%= u.role %></span></td>
                       <td class="text-end">
                         <div class="d-inline-flex gap-1">
-                          <button class="btn btn-sm btn-outline-light" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset</button>
+                          <button class="btn btn-sm btn-outline-secondary" data-pw="<%= u.id %>" data-name="<%= u.name %>">Reset</button>
                           <button class="btn btn-sm btn-outline-danger" data-del-user="<%= u.id %>">Delete</button>
                         </div>
                       </td>

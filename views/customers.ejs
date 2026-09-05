@@ -4,7 +4,7 @@
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">Customers</h1>
+        <h1 class="h4 mb-0 fw-bold">Customers</h1>
         <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= customers.length %> Total</span>
       </div>
 
@@ -65,15 +65,15 @@
               <% } %>
               <% customers.forEach((c) => { %>
               <tr>
-                <td class="fw-semibold text-white"><%= c.name %></td>
+                <td class="fw-semibold"><%= c.name %></td>
                 <td><span class="badge text-bg-primary bg-gradient font-monospace"><%= c.plan || '—' %></span></td>
                 <td class="font-monospace small"><%= c.vehicle_count %></td>
                 <td class="font-monospace small"><%= c.user_count %></td>
                 <td class="font-monospace small text-body-secondary"><%= c.alert_email || '—' %></td>
                 <td class="text-end">
                   <div class="d-inline-flex gap-2">
-                    <a class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" href="/admin/customers/<%= c.id %>">Manage</a>
-                    <button class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" data-edit='<%= JSON.stringify({ id: c.id, name: c.name, plan_id: c.plan_id, alert_email: c.alert_email, alert_webhook: c.alert_webhook }) %>'>Edit</button>
+                    <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="/admin/customers/<%= c.id %>">Manage</a>
+                    <button class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" data-edit='<%= JSON.stringify({ id: c.id, name: c.name, plan_id: c.plan_id, alert_email: c.alert_email, alert_webhook: c.alert_webhook }) %>'>Edit</button>
                   </div>
                 </td>
               </tr>
@@ -85,9 +85,9 @@
 
       <div class="modal fade" id="edit-modal" tabindex="-1">
         <div class="modal-dialog modal-dialog-centered">
-          <div class="modal-content border border-secondary-subtle" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(16px); border-radius: 14px;">
+          <div class="modal-content border border-secondary-subtle" style="background: var(--panel); border-radius: 14px;">
             <form id="edit-customer" class="p-4">
-              <h2 class="h6 font-semibold text-white mb-3" id="edit-title"></h2>
+              <h2 class="h6 font-semibold mb-3" id="edit-title"></h2>
               <div class="mb-3">
                 <label class="form-label text-body-secondary small font-medium">Plan</label>
                 <select class="form-select" name="planId"><% plans.forEach((p) => { %><option value="<%= p.id %>"><%= p.name %></option><% }) %></select>

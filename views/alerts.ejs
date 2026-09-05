@@ -19,7 +19,7 @@
               <tr>
                 <td class="font-monospace small text-body-secondary"><%= fmtDT(a.created_at) %></td>
                 <td><span class="badge <%= a.type === 'enter' || a.type === 'online' ? 'text-bg-success' : 'text-bg-danger' %> font-monospace text-uppercase" style="font-size: 10px;"><%= a.type %></span></td>
-                <td class="text-white fw-medium"><%= a.message %></td>
+                <td class="fw-medium"><%= a.message %></td>
                 <td class="font-monospace small text-body-secondary"><%= fmtDT(a.resolved_at) %></td>
               </tr>
               <% }) %>

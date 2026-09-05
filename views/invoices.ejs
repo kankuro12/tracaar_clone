@@ -4,7 +4,7 @@
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">Invoices</h1>
+        <h1 class="h4 mb-0 fw-bold">Invoices</h1>
       </div>
       <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/invoices' }) %>
       
@@ -15,11 +15,11 @@
             <tbody>
               <% invoices.forEach((i) => { %>
               <tr>
-                <td class="fw-semibold text-white"><%= i.customer %></td>
+                <td class="fw-semibold"><%= i.customer %></td>
                 <td class="font-monospace small text-body-secondary"><%= i.period_start %> → <%= i.period_end %></td>
                 <td class="font-monospace fw-semibold"><%= money(i.amount) %></td>
                 <td><%= i.status === 'paid' ? '<span class="badge text-bg-success bg-gradient">Paid</span>' : '<span class="badge text-bg-warning bg-gradient">Open</span>' %></td>
-                <td class="text-end"><% if (i.status === 'open') { %><button class="btn btn-sm btn-outline-light" data-pay="<%= i.id %>">Mark Paid</button><% } %></td>
+                <td class="text-end"><% if (i.status === 'open') { %><button class="btn btn-sm btn-outline-secondary" data-pay="<%= i.id %>">Mark Paid</button><% } %></td>
               </tr>
               <% }) %>
             </tbody>

@@ -4,7 +4,7 @@
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">Users</h1>
+        <h1 class="h4 mb-0 fw-bold">Users</h1>
         <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= users.length %> Total</span>
       </div>
 
@@ -48,13 +48,13 @@
             <tbody>
               <% users.forEach((u) => { %>
               <tr>
-                <td class="fw-semibold text-white"><%= u.name %></td>
+                <td class="fw-semibold"><%= u.name %></td>
                 <td class="font-monospace small text-body-secondary"><%= u.email %></td>
                 <td>
                   <span class="badge text-bg-dark border border-secondary-subtle font-monospace text-uppercase" style="font-size: 10px;"><%= u.role %></span>
                 </td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-light d-inline-flex align-items-center gap-1" data-pw="<%= u.id %>" data-name="<%= u.name %>">
+                  <button class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" data-pw="<%= u.id %>" data-name="<%= u.name %>">
                     <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
                     Reset Password
                   </button>

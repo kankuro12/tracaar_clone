@@ -5,7 +5,7 @@
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
-          <h1 class="h4 mb-1 fw-bold text-white">Blocked IMEI Forensics</h1>
+          <h1 class="h4 mb-1 fw-bold">Blocked IMEI Forensics</h1>
           <div class="text-body-secondary small">Unknown devices still sending data — deduped by IMEI, with last IP + last frame. Updates automatically.</div>
         </div>
         <div class="d-flex gap-2 align-items-center">
@@ -37,7 +37,7 @@
               <% } %>
               <% rows.forEach((r) => { %>
               <tr>
-                <td class="font-monospace fw-semibold text-white"><%= r.imei %></td>
+                <td class="font-monospace fw-semibold"><%= r.imei %></td>
                 <td><span class="badge text-bg-warning font-monospace"><%= r.hits %></span></td>
                 <td class="font-monospace small">
                   <% if (r.last_ip) { %>
@@ -53,7 +53,7 @@
                 </td>
                 <td class="font-monospace small text-body-secondary" style="max-width: 320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<%= r.last_raw || '' %>"><%= r.last_raw || '—' %></td>
                 <td class="text-end">
-                  <button class="btn btn-sm btn-outline-light btn-clear" data-imei="<%= r.imei %>">Clear</button>
+                  <button class="btn btn-sm btn-outline-secondary btn-clear" data-imei="<%= r.imei %>">Clear</button>
                 </td>
               </tr>
               <% }) %>

@@ -4,7 +4,7 @@
     <%- include('partials/nav', { active }) %>
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-4">
-        <h1 class="h4 mb-0 fw-bold text-white">ERP Integration Keys</h1>
+        <h1 class="h4 mb-0 fw-bold">ERP Integration Keys</h1>
       </div>
 
       <div class="card mb-4">
@@ -50,7 +50,7 @@
               <% if (!keys.length) { %><tr><td colspan="5" class="text-body-secondary py-4 text-center">No integration keys generated yet.</td></tr><% } %>
               <% keys.forEach((k) => { %>
               <tr>
-                <td class="fw-semibold text-white"><%= k.name %></td>
+                <td class="fw-semibold"><%= k.name %></td>
                 <td class="font-monospace small text-body-secondary"><%= k.client_id || '—' %></td>
                 <td class="font-monospace small text-body-secondary"><%= fmtDT(k.created_at) %></td>
                 <td><%= k.revoked_at ? '<span class="badge text-bg-secondary font-monospace">revoked</span>' : '<span class="badge text-bg-success font-monospace">active</span>' %></td>
