@@ -228,6 +228,14 @@ a { color: var(--primary); }
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }
 
+/* .flex-grow-1 alone leaves flex-basis:auto, so two buttons with different
+   label lengths (e.g. "Live" / "Trips") grow by the same amount but never
+   end up the same width. flex-basis:0 makes them split space evenly. */
+.btn.flex-grow-1 {
+  flex-basis: 0;
+  min-width: 0;
+}
+
 .btn-primary {
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.25);
 }
@@ -510,6 +518,15 @@ a { color: var(--primary); }
   /* Touch target accessibility (min 44px height) */
   .btn, .form-control, .form-select, .nav-link, .vehicle-row {
     min-height: 44px;
+  }
+
+  /* min-height alone stretches the box but not the text — a plain .btn has
+     no flex centering, so label + icon sit near the top with dead space
+     below instead of centered. Force centering on the taller box. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 
   .admin-main {
