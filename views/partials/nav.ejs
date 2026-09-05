@@ -1,8 +1,40 @@
-<nav class="admin-nav d-flex flex-column gap-1 p-3 border-end">
+<%
+// One icon per nav destination, matched by label. Falls back to a generic
+// dot if a label isn't in the map, so a future nav entry never renders blank.
+const NAV_ICONS = {
+  'Overview': '<circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/>',
+  'Live map': '<path d="M12 22s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z"/><circle cx="12" cy="11" r="2.5"/>',
+  'Trips': '<path d="M3 12h4l2-7 4 14 2-7h6"/>',
+  'Alerts': '<path d="M12 2a6 6 0 0 0-6 6c0 5-2 6-2 7h16s-2-1-2-7a6 6 0 0 0-6-6z"/><path d="M10 19a2 2 0 0 0 4 0"/>',
+  'Reports': '<path d="M4 20V10M11 20V4M18 20v-7"/>',
+  'Vehicles': '<path d="M3 13l2-6h9l3 6"/><path d="M3 13h16v4H3z"/><circle cx="7" cy="19" r="1.6"/><circle cx="16" cy="19" r="1.6"/>',
+  'Drivers': '<circle cx="12" cy="8" r="3.5"/><path d="M5 20c0-3.5 3-6 7-6s7 2.5 7 6"/>',
+  'Driver scores': '<path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 12 19 5"/><path d="M12 12h.01"/>',
+  'Maintenance': '<path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4l-2.6 2.6-2-2 2.6-2.6z"/>',
+  'Geofences': '<circle cx="12" cy="12" r="9" stroke-dasharray="3 3"/><circle cx="12" cy="12" r="2"/>',
+  'Billing': '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  'Integration': '<rect x="3" y="9" width="6" height="6" rx="1"/><rect x="15" y="9" width="6" height="6" rx="1"/><path d="M9 12h6"/>',
+  'Customers': '<circle cx="9" cy="8" r="3"/><path d="M2 20c0-3 3-5 7-5s7 2 7 5"/><circle cx="18" cy="9" r="2.3"/><path d="M15.5 20c.3-2.2 2-4 4.5-4.4"/>',
+  'Plans': '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4"/><path d="M9 12h6M9 16h6"/>',
+  'Invoices': '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  'Blocked IMEIs': '<circle cx="12" cy="12" r="9"/><path d="M6 6l12 12"/>',
+};
+const iconFor = (label) => NAV_ICONS[label] || '<circle cx="12" cy="12" r="3"/>';
+// Pages with no permanent sidebar (the live map) still need the nav reachable
+// from the mobile hamburger. `standalone` renders it purely as an off-canvas
+// drawer that takes no space in the desktop layout.
+const standalone = typeof locals.standalone !== 'undefined' && locals.standalone;
+%>
+<div class="nav-backdrop" data-nav-backdrop></div>
+<nav class="admin-nav d-flex flex-column gap-1 p-3 border-end<%= standalone ? ' admin-nav-standalone' : '' %>">
+  <div class="nav-drawer-head d-flex d-md-none align-items-center justify-content-between mb-2 pb-2 border-bottom">
+    <span class="fw-bold small text-uppercase text-body-secondary" style="letter-spacing:.05em">Menu</span>
+    <button type="button" class="btn-close" data-nav-close aria-label="Close menu"></button>
+  </div>
   <% (nav || []).forEach(([href, label]) => { %>
-  <a class="admin-tab nav-link rounded-3 px-3 py-2 d-flex align-items-center justify-content-between <%= (href === '/admin/' + active || href === '/' + active) ? 'active text-white bg-primary shadow-sm' : '' %>" href="<%= href %>">
-    <span><%= label %></span>
-    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"><polyline points="9 18 15 12 9 6"/></svg>
+  <a class="admin-tab nav-link rounded-3 px-3 py-2 d-flex align-items-center gap-2 <%= (href === '/admin/' + active || href === '/' + active) ? 'active bg-primary shadow-sm' : '' %>" href="<%= href %>">
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="admin-tab-icon flex-shrink-0"><%- iconFor(label) %></svg>
+    <span class="flex-grow-1"><%= label %></span>
   </a>
   <% }) %>
 </nav>

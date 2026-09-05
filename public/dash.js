@@ -70,3 +70,26 @@ $(document).on('click', '#theme-toggle', () => {
 })();
 
 $(document).on('click', '#alert-bell', () => { location.href = '/portal/alerts'; });
+
+// ---- mobile nav drawer ----
+function openNav() {
+  $('.admin-nav').addClass('open');
+  $('[data-nav-backdrop]').addClass('show');
+  $('[data-nav-toggle]').attr('aria-expanded', 'true');
+  document.body.classList.add('nav-open-lock');
+}
+function closeNav() {
+  $('.admin-nav').removeClass('open');
+  $('[data-nav-backdrop]').removeClass('show');
+  $('[data-nav-toggle]').attr('aria-expanded', 'false');
+  document.body.classList.remove('nav-open-lock');
+}
+$(document).on('click', '[data-nav-toggle]', () => {
+  $('.admin-nav').hasClass('open') ? closeNav() : openNav();
+});
+$(document).on('click', '[data-nav-backdrop], [data-nav-close]', closeNav);
+$(document).on('click', '.admin-nav a', () => { if (window.innerWidth < 768) closeNav(); });
+$(document).on('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
+// resizing past the mobile breakpoint (rotating a tablet, etc.) shouldn't
+// leave the drawer "open" with the lock still applied
+window.addEventListener('resize', () => { if (window.innerWidth >= 768) closeNav(); });

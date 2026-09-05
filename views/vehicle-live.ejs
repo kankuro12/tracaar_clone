@@ -1,6 +1,7 @@
 <%- include('partials/head', { title: `${vehicle.name} — Live Tracking` }) %>
   <%- include('partials/topbar', { showLive: true }) %>
-  
+  <%- include('partials/nav', { active: 'vehicles', standalone: true }) %>
+
   <div class="vehicle-live-container">
     <!-- Telemetry HUD Sidebar -->
     <aside class="live-hud-panel p-3">
