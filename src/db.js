@@ -115,4 +115,35 @@ async function createAlert({ customerId, vehicleId, geofenceId, type, message, l
   return r.rows[0];
 }
 
-module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert };
+// Blocked IMEI forensics — deduped by imei PK, upsert on every unknown frame
+async function recordBlockedImei({ imei, ip, raw, lat, lon }) {
+  await pool.query(
+    `INSERT INTO blocked_imei_hits (imei, first_seen, last_seen, hits, last_ip, last_raw, last_lat, last_lon)
+     VALUES ($1, now(), now(), 1, $2, $3, $4, $5)
+     ON CONFLICT (imei) DO UPDATE SET
+       last_seen = now(),
+       hits = blocked_imei_hits.hits + 1,
+       last_ip = EXCLUDED.last_ip,
+       last_raw = EXCLUDED.last_raw,
+       last_lat = EXCLUDED.last_lat,
+       last_lon = EXCLUDED.last_lon`,
+    [imei, ip || null, raw || null, lat ?? null, lon ?? null]
+  );
+}
+
+async function listBlockedImeis({ limit = 100, offset = 0 } = {}) {
+  const r = await pool.query(
+    `SELECT imei, first_seen, last_seen, hits, last_ip, last_raw, last_lat, last_lon
+     FROM blocked_imei_hits ORDER BY last_seen DESC LIMIT $1 OFFSET $2`,
+    [limit, offset]
+  );
+  const c = await pool.query(`SELECT count(*) FROM blocked_imei_hits`);
+  return { rows: r.rows, total: +c.rows[0].count };
+}
+
+async function clearBlockedImei(imei) {
+  if (imei) await pool.query(`DELETE FROM blocked_imei_hits WHERE imei = $1`, [imei]);
+  else await pool.query(`TRUNCATE blocked_imei_hits`);
+}
+
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei };

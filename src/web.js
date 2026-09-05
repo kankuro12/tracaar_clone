@@ -14,6 +14,7 @@ const NAV = {
     ['/admin/customers', 'Customers'],
     ['/admin/plans', 'Plans'],
     ['/admin/invoices', 'Invoices'],
+    ['/admin/blocked-imeis', 'Blocked IMEIs'],
   ],
   admin: [
     ['/admin/users', 'Users'],
@@ -95,8 +96,15 @@ router.get('/', loadUser, (req, res) => {
   res.render('map', { token: req.session.token, active: '' });
 });
 
-// ---- admin pages ----
-const SUPER_ONLY = { customers: 1, 'customers/:id': 1, plans: 1, invoices: 1 };
+const SUPER_ONLY = { customers: 1, 'customers/:id': 1, plans: 1, invoices: 1, 'blocked-imeis': 1 };
+
+// ---- blocked IMEI forensics (super_admin) — explicit route before generic ----
+router.get('/admin/blocked-imeis', loadUser, rolePage('super_admin'), async (req, res) => {
+  const q = pageQuery(req);
+  const { listBlockedImeis } = require('./db');
+  const { rows, total } = await listBlockedImeis({ limit: q.per, offset: q.offset });
+  res.render('blocked-imeis', { rows, page: q.page, pages: Math.ceil(total / q.per), total, active: 'blocked-imeis' });
+});
 
 router.get('/admin/customers/:id', loadUser, rolePage('super_admin'), async (req, res) => {
   const c = await pool.query(

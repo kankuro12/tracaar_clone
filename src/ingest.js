@@ -1,6 +1,6 @@
 const net = require('net');
 const { parseFrame } = require('./protocol');
-const { getVehicleByImei, insertPosition, resolveOfflineAlert, createAlert } = require('./db');
+const { getVehicleByImei, insertPosition, resolveOfflineAlert, createAlert, recordBlockedImei } = require('./db');
 const { checkGeofences } = require('./geo');
 const { notifyAlert } = require('./notify');
 
@@ -27,12 +27,13 @@ function startIngest({ port, hub, log = console.log }) {
       while ((idx = buf.indexOf('#')) !== -1) {
         const raw = buf.slice(0, idx + 1);
         buf = buf.slice(idx + 1);
-        handleFrame(raw).catch((e) => log(`ingest: ${e.message}`));
+        const ip = socket.remoteAddress;
+        handleFrame(raw, ip).catch((e) => log(`ingest: ${e.message}`));
       }
     });
   });
 
-  async function handleFrame(raw) {
+  async function handleFrame(raw, ip) {
     log(`[${new Date().toLocaleString()}] ingest: frame [${raw.trim()}]`); // debug: log every frame
     let frame;
     try {
@@ -43,7 +44,9 @@ function startIngest({ port, hub, log = console.log }) {
     }
     const vehicle = await getVehicleByImei(frame.imei);
     if (!vehicle) {
-      log(`[${new Date().toLocaleString()}] ingest: UNKNOWN IMEI ${frame.imei} — frame discarded [${raw.trim()}]`);
+      log(`[${new Date().toLocaleString()}] ingest: UNKNOWN IMEI ${frame.imei} from ${ip || '?'} — frame discarded [${raw.trim()}]`);
+      // forensics: deduped by PK, report IP
+      recordBlockedImei({ imei: frame.imei, ip: ip || null, raw: raw.trim(), lat: frame.lat, lon: frame.lon }).catch((e) => log(`blocked-imei record failed: ${e.message}`));
       return;
     }
     const seen = lastDeviceTime.get(frame.imei);

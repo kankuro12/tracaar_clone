@@ -134,3 +134,16 @@ ALTER TABLE integration_keys
   ADD COLUMN IF NOT EXISTS password_hash TEXT;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_keys_client ON integration_keys (client_id) WHERE client_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_integration_keys_username ON integration_keys (username) WHERE username IS NOT NULL;
+
+-- ---- Blocked IMEI forensics (unknown devices still sending) ----
+CREATE TABLE IF NOT EXISTS blocked_imei_hits (
+  imei       TEXT PRIMARY KEY,
+  first_seen TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  hits       BIGINT NOT NULL DEFAULT 1,
+  last_ip    TEXT,
+  last_raw   TEXT,
+  last_lat   DOUBLE PRECISION,
+  last_lon   DOUBLE PRECISION
+);
+CREATE INDEX IF NOT EXISTS idx_blocked_imei_last_seen ON blocked_imei_hits (last_seen DESC);

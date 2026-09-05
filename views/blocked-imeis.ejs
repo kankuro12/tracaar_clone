@@ -1,0 +1,96 @@
+<%- include('partials/head', { title: 'Blocked IMEIs — Forensics' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+          <h1 class="h4 mb-1 fw-bold text-white">Blocked IMEI Forensics</h1>
+          <div class="text-body-secondary small">Unknown devices still sending data — deduped by IMEI, with last IP + last frame. Updates automatically.</div>
+        </div>
+        <div class="d-flex gap-2 align-items-center">
+          <span class="badge text-bg-dark border border-secondary-subtle px-3 py-2 font-monospace"><%= total %> unique IMEIs</span>
+          <button id="btn-clear-all" class="btn btn-sm btn-outline-danger" <%= !rows.length ? 'disabled' : '' %>>Clear all</button>
+        </div>
+      </div>
+
+      <%- include('partials/pager', { page, pages, total, baseUrl: '/admin/blocked-imeis' }) %>
+
+      <div class="card overflow-hidden my-3">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>IMEI</th>
+                <th>Hits</th>
+                <th>Last IP</th>
+                <th>Last Seen</th>
+                <th>First Seen</th>
+                <th>Last Position</th>
+                <th>Last Raw</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!rows.length) { %>
+                <tr><td colspan="8" class="text-body-secondary py-5 text-center">No blocked IMEIs seen — unknown devices not sending, or ingest not yet receiving.</td></tr>
+              <% } %>
+              <% rows.forEach((r) => { %>
+              <tr>
+                <td class="font-monospace fw-semibold text-white"><%= r.imei %></td>
+                <td><span class="badge text-bg-warning font-monospace"><%= r.hits %></span></td>
+                <td class="font-monospace small">
+                  <% if (r.last_ip) { %>
+                    <span class="text-info"><%= r.last_ip %></span>
+                  <% } else { %> <span class="text-body-secondary">—</span> <% } %>
+                </td>
+                <td class="font-monospace small text-body-secondary"><%= fmtDT(r.last_seen) %></td>
+                <td class="font-monospace small text-body-secondary"><%= fmtDT(r.first_seen) %></td>
+                <td class="font-monospace small">
+                  <% if (r.last_lat != null && r.last_lon != null) { %>
+                    <a href="https://maps.google.com/?q=<%= r.last_lat %>,<%= r.last_lon %>" target="_blank" class="text-decoration-none"><%= Number(r.last_lat).toFixed(5) %>, <%= Number(r.last_lon).toFixed(5) %></a>
+                  <% } else { %> <span class="text-body-secondary">—</span> <% } %>
+                </td>
+                <td class="font-monospace small text-body-secondary" style="max-width: 320px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="<%= r.last_raw || '' %>"><%= r.last_raw || '—' %></td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-outline-light btn-clear" data-imei="<%= r.imei %>">Clear</button>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="mt-3"><%- include('partials/pager', { page, pages, total, baseUrl: '/admin/blocked-imeis' }) %></div>
+
+      <div class="card mt-4 border-warning border-opacity-50">
+        <div class="card-body p-3">
+          <h6 class="small fw-bold text-warning mb-1">How it works</h6>
+          <div class="small text-body-secondary">
+            Every TCP frame with an IMEI not in <code>vehicles</code> is discarded but recorded here (one row per IMEI, <code>hits</code> increments).
+            IP is taken from the TCP socket <code>remoteAddress</code> — set <code>trustProxy</code> not needed for raw TCP.
+            To whitelist a device, add its IMEI via Customers → Manage → Vehicles or <code>POST /api/customers/:id/vehicles</code>.
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+  <script>
+    async function delOne(imei) {
+      await api('/api/blocked-imeis/' + encodeURIComponent(imei), { method: 'DELETE' });
+      location.reload();
+    }
+    async function delAll() {
+      if (!confirm('Clear all blocked IMEI records?')) return;
+      await api('/api/blocked-imeis', { method: 'DELETE' });
+      location.reload();
+    }
+    $('.btn-clear').on('click', function(){ delOne(this.dataset.imei).catch(e=>showErr(document.body,e.message)); });
+    $('#btn-clear-all').on('click', function(){ delAll().catch(e=>showErr(document.body,e.message)); });
+    // auto-refresh every 30s while forensics page open (cheap polling, super_admin only)
+    setTimeout(()=>location.reload(), 30000);
+  </script>
+</body>
+</html>

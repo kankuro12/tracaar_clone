@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei } = require('./db');
 
 const router = Router();
 
@@ -627,6 +627,29 @@ router.get('/integration/vehicles', async (req, res) => {
   if (!key) return;
   const r = await pool.query('SELECT id, name, plate, imei FROM vehicles WHERE customer_id = $1 ORDER BY id', [key.customer_id]);
   res.json(r.rows);
+});
+
+// ---- Blocked IMEI forensics (super_admin) — deduped list + IP ----
+router.get('/blocked-imeis', auth, requireRole('super_admin'), async (req, res) => {
+  const limit = Math.min(+req.query.limit || 100, 500);
+  const offset = Math.max(+req.query.offset || 0, 0);
+  const page = Math.max(+req.query.page || 1, 1);
+  const per = Math.min(+req.query.per || limit, 500);
+  const off = req.query.page ? (page - 1) * per : offset;
+  const lim = req.query.page ? per : limit;
+  const { rows, total } = await listBlockedImeis({ limit: lim, offset: off });
+  res.json({ rows, total, page: req.query.page ? page : undefined, per: lim });
+});
+
+router.delete('/blocked-imeis/:imei', auth, requireRole('super_admin'), async (req, res) => {
+  await clearBlockedImei(req.params.imei);
+  res.status(204).end();
+});
+
+router.delete('/blocked-imeis', auth, requireRole('super_admin'), async (req, res) => {
+  const imei = req.query.imei || (req.body && req.body.imei);
+  await clearBlockedImei(imei || null);
+  res.status(204).end();
 });
 
 module.exports = router;
