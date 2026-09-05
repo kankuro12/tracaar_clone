@@ -84,14 +84,10 @@ a { color: var(--primary); }
   position: sticky;
   top: 56px;
   flex-shrink: 0;
+  overflow-y: auto;
   background: var(--panel);
   border-color: var(--border) !important;
 }
-
-/* the item list scrolls on its own; the theme-toggle/sign-out footer always
-   stays pinned in view instead of being pushed below the fold by a long
-   nav list (see .nav-items / .nav-footer in partials/nav.ejs) */
-.nav-items { min-height: 0; }
 
 /* off-canvas backdrop for the mobile nav drawer; only ever shown below 768px */
 .nav-backdrop { display: none; }
@@ -109,6 +105,7 @@ a { color: var(--primary); }
 .admin-tab {
   color: var(--muted);
   font-weight: 500;
+  font-size: 13.5px;
   border-radius: 8px;
   transition: background 0.15s ease, color 0.15s ease;
 }
@@ -159,6 +156,26 @@ a { color: var(--primary); }
 
 .kpi-card { border-left: 4px solid var(--brand, var(--primary)); }
 .kpi-value { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; }
+.kpi-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.vehicle-card-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--primary-soft);
+  color: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .empty-state { padding: 2.5rem 1rem; text-align: center; color: var(--muted); }
 .table-search { max-width: 280px; }
 .toast-box .toast { min-width: 280px; box-shadow: var(--shadow-lg); border-radius: 10px; }

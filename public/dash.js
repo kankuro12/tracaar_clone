@@ -1,5 +1,11 @@
 /* Shared dashboard helpers — jQuery + session-cookie auth. No tokens in JS. */
 
+// Every timestamp in the UI shows Nepal Time (UTC+5:45), independent of the
+// server's or the viewer's own local timezone — matches src/web.js's fmtDT.
+const NPT_TZ = 'Asia/Kathmandu';
+window.fmtNPT = (d) => (d ? new Date(d).toLocaleString('en-US', { timeZone: NPT_TZ, dateStyle: 'medium', timeStyle: 'short' }) : '—');
+window.fmtNPTTime = (d) => (d ? new Date(d).toLocaleTimeString('en-US', { timeZone: NPT_TZ }) : '—');
+
 const api = (path, opts = {}) => new Promise((resolve, reject) => {
   $.ajax({
     url: path,

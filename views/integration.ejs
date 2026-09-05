@@ -102,7 +102,7 @@
       const ttl = +$('#test-ttl').val() || 300;
       try {
         const r = await api('/api/integration/session', { method: 'POST', body: JSON.stringify({ vehicleIds: vids, ttlSeconds: ttl }) });
-        $('#session-result').html(`<p class="small text-body-secondary mb-1">Expires ${new Date(r.expiresAt).toLocaleString()} — connect with:</p><textarea class="form-control font-monospace" rows="3" readonly>wss://${location.host}${r.wsUrl}</textarea>`);
+        $('#session-result').html(`<p class="small text-body-secondary mb-1">Expires ${window.fmtNPT(r.expiresAt)} NPT — connect with:</p><textarea class="form-control font-monospace" rows="3" readonly>wss://${location.host}${r.wsUrl}</textarea>`);
       } catch (err) { $('#session-result').html(`<div class="alert alert-danger py-2">${esc(err.message)}</div>`); }
     });
   </script>

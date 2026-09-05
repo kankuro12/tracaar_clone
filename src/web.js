@@ -44,7 +44,12 @@ const NAV = {
 };
 
 const money = (n) => `$${Number(n).toFixed(2)}`;
-const fmtDT = (s) => (s ? new Date(s).toLocaleString() : '—');
+// All timestamps display in Nepal Time (UTC+5:45) regardless of where the
+// server or the viewer's browser is — a fleet based in Nepal shouldn't have
+// to mentally convert every alert and invoice timestamp.
+const NPT_TZ = 'Asia/Kathmandu';
+const fmtDT = (s) => (s ? new Date(s).toLocaleString('en-US', { timeZone: NPT_TZ, dateStyle: 'medium', timeStyle: 'short' }) : '—');
+const fmtT = (s) => (s ? new Date(s).toLocaleTimeString('en-US', { timeZone: NPT_TZ }) : '—');
 
 function pageQuery(req) {
   const page = Math.max(1, +req.query.page || 1);
@@ -61,6 +66,7 @@ function pager(page, pages, base) {
 router.use((req, res, next) => {
   res.locals.money = money;
   res.locals.fmtDT = fmtDT;
+  res.locals.fmtT = fmtT;
   res.locals.pager = pager;
   res.locals.user = req.session && req.session.user;
   res.locals.nav = res.locals.user ? NAV[res.locals.user.role] || [] : [];

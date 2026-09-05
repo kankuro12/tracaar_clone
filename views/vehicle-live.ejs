@@ -1,8 +1,8 @@
 <%- include('partials/head', { title: `${vehicle.name} — Live Tracking` }) %>
   <%- include('partials/topbar', { showLive: true }) %>
-  <%- include('partials/nav', { active: 'vehicles', standalone: true }) %>
-
-  <div class="vehicle-live-container">
+  <div class="d-flex">
+    <%- include('partials/nav', { active: 'vehicles' }) %>
+    <div class="vehicle-live-container flex-grow-1" style="min-width: 0;">
     <!-- Telemetry HUD Sidebar -->
     <aside class="live-hud-panel p-3">
       <!-- Back & Navigation -->
@@ -69,8 +69,8 @@
               <span class="text-light" id="hud-time-ago">—</span>
             </div>
             <div class="d-flex justify-content-between mt-1">
-              <span class="text-secondary" style="font-size: 11px;">Device Time:</span>
-              <span class="text-body-secondary" id="hud-device-time" style="font-size: 11px;"><%= vehicle.position && vehicle.position.deviceTime ? new Date(vehicle.position.deviceTime).toLocaleTimeString() : '—' %></span>
+              <span class="text-secondary" style="font-size: 11px;">Device Time (NPT):</span>
+              <span class="text-body-secondary" id="hud-device-time" style="font-size: 11px;"><%= vehicle.position && vehicle.position.deviceTime ? fmtT(vehicle.position.deviceTime) : '—' %></span>
             </div>
           </div>
         </div>
@@ -141,6 +141,7 @@
         </div>
       </div>
       <div id="map" style="height: 100%"></div>
+    </div>
     </div>
   </div>
 
@@ -253,7 +254,7 @@
         document.getElementById('hud-lon').textContent = fmt(pos.lon);
         document.getElementById('hud-time-ago').textContent = timeSince(pos.recordedAt);
         if (pos.deviceTime) {
-          document.getElementById('hud-device-time').textContent = new Date(pos.deviceTime).toLocaleTimeString();
+          document.getElementById("hud-device-time").textContent = window.fmtNPTTime(pos.deviceTime);
         }
 
         if (vehicle.destination) {
@@ -274,7 +275,7 @@
 
       const item = document.createElement('div');
       item.className = 'fix-history-item d-flex align-items-center justify-content-between';
-      const timeStr = pos.deviceTime ? new Date(pos.deviceTime).toLocaleTimeString() : new Date().toLocaleTimeString();
+      const timeStr = window.fmtNPTTime(pos.deviceTime || Date.now());
       item.innerHTML = `
         <span class="text-light">${timeStr}</span>
         <span class="text-primary">${kmh(pos.speedKn)} km/h</span>
