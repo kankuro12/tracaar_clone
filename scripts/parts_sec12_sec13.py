@@ -220,7 +220,7 @@ HTTP/1.1 204 No Content</code></pre>
   &lt;script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"&gt;&lt;/script&gt;
   &lt;script&gt;
     const CONFIG = {
-      wsBaseUrl: "ws://localhost:3000/ws",
+      wsBaseUrl: "wss://map.needtechnosoft.com/ws",
       sessionToken: "PASTE_YOUR_SESSION_JWT_TOKEN_HERE" 
     };
 

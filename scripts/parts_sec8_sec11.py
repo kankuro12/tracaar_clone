@@ -216,7 +216,7 @@ class FleetTrackingClient:
             logging.info(f"SNAPSHOT: Received initial states for {len(data.get('positions', []))} vehicles.")
 
 if __name__ == "__main__":
-    client = FleetTrackingClient("http://localhost:3000", "odoo-prod", "fk_7a2b9c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7")
+    client = FleetTrackingClient("https://map.needtechnosoft.com", "odoo-prod", "fk_7a2b9c3d4e5f60718293a4b5c6d7e8f9a0b1c2d3e4f5a6b7")
     asyncio.run(client.stream_live_telematics([2, 3, 4]))</code></pre>
             </div>
 
