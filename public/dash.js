@@ -99,3 +99,20 @@ $(document).on('keydown', (e) => { if (e.key === 'Escape') closeNav(); });
 // resizing past the mobile breakpoint (rotating a tablet, etc.) shouldn't
 // leave the drawer "open" with the lock still applied
 window.addEventListener('resize', () => { if (window.innerWidth >= 768) closeNav(); });
+
+// ---- PWA install button ----
+// Chrome only fires beforeinstallprompt when the manifest/SW criteria are met
+// (and never at all if already installed), so the button stays hidden until then.
+let deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  $('#pwa-install-btn').removeClass('d-none');
+});
+$(document).on('click', '#pwa-install-btn', async () => {
+  if (!deferredInstallPrompt) return;
+  $('#pwa-install-btn').addClass('d-none');
+  await deferredInstallPrompt.prompt();
+  deferredInstallPrompt = null;
+});
+window.addEventListener('appinstalled', () => { $('#pwa-install-btn').addClass('d-none'); });

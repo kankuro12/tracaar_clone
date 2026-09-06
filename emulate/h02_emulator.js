@@ -19,7 +19,7 @@ const IMEIS = Array.from({ length: NUM_DEVICES }, (_, i) =>
 );
 
 const SEND_INTERVAL_SEC = 2.0;
-const RUN_SECONDS = 300;
+const RUN_SECONDS = null; // null = run until Ctrl+C
 
 // ---------------------------------------------------------------------
 // Route loading

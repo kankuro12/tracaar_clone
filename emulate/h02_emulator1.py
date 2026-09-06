@@ -34,18 +34,18 @@ from datetime import datetime, timezone
 # ---------------------------------------------------------------------
 # CONFIG
 # ---------------------------------------------------------------------
-TARGET_HOST = "103.250.133.128"   # localhost only - point at your own test server
+TARGET_HOST = "139.99.135.69"   # localhost only - point at your own test server
 TARGET_PORT = 8090
 
 ROUTE_CSV = "route_dense.csv"   # output of road_route_densify.py
                                   # requires at least "lat","lon" columns
 
 # 100 IMEIs (10-digit test ids, clearly not real device identifiers).
-NUM_DEVICES = 100
+NUM_DEVICES = 10
 IMEIS = [f"{1000000001 + i:010d}" for i in range(NUM_DEVICES)]
 
 SEND_INTERVAL_SEC = 2.0   # how often each device sends a packet
-RUN_SECONDS = 300         # stop the whole simulation after this long (None = run until Ctrl+C)
+RUN_SECONDS = None        # stop the whole simulation after this long (None = run until Ctrl+C)
 
 
 # ---------------------------------------------------------------------
