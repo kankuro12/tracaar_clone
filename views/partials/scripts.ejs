@@ -1,7 +1,21 @@
 <script>
   window.MAP_CONFIG = <%- JSON.stringify(mapConfig) %>;
   // Base tile layer for every map page - provider chosen by MAP_TYPE (see src/maps.js).
-  window.baseLayer = (map) => L.tileLayer(MAP_CONFIG.url, { maxZoom: MAP_CONFIG.maxZoom, attribution: MAP_CONFIG.attribution }).addTo(map);
+  // On a provider error we show the error over the map container rather than
+  // quietly swapping in a different map.
+  window.baseLayer = (map) => {
+    if (MAP_CONFIG.error) {
+      const el = map.getContainer();
+      const box = document.createElement('div');
+      box.className = 'map-error';
+      box.innerHTML = '<strong>Map unavailable</strong><span></span><small>Provider: ' + MAP_CONFIG.provider + '</small>';
+      box.querySelector('span').textContent = MAP_CONFIG.error;
+      el.appendChild(box);
+      console.error('map provider error:', MAP_CONFIG.error);
+      return null;
+    }
+    return L.tileLayer(MAP_CONFIG.url, { maxZoom: MAP_CONFIG.maxZoom, attribution: MAP_CONFIG.attribution }).addTo(map);
+  };
 </script>
 <script src="https://cdn.jsdelivr.net/npm/jquery@4.0.0/dist/jquery.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
