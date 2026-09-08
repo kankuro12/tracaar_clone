@@ -18,7 +18,7 @@
 <script src="/vendor/leaflet/leaflet.js"></script>
 <script>
 const map = L.map('trip-map').setView([27.7, 85.3], 12);
-L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+baseLayer(map);
 let pts = [], line = null, marker = null, timer = null, idx = 0;
 async function load() {
   const vid = $('#trip-vehicle').val();

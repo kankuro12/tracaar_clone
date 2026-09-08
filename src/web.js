@@ -7,6 +7,7 @@ const { pool, latestPositions, canSeeVehicle } = require('./db');
 const { sign } = require('./auth');
 const { rateLimit } = require('./ratelimit');
 const { revenueSummary } = require('./billing');
+const { mapConfig } = require('./maps');
 
 const router = Router();
 const PER_PAGE = 25;
@@ -63,13 +64,14 @@ function pager(page, pages, base) {
   return links.join('');
 }
 
-router.use((req, res, next) => {
+router.use(async (req, res, next) => {
   res.locals.money = money;
   res.locals.fmtDT = fmtDT;
   res.locals.fmtT = fmtT;
   res.locals.pager = pager;
   res.locals.user = req.session && req.session.user;
   res.locals.nav = res.locals.user ? NAV[res.locals.user.role] || [] : [];
+  res.locals.mapConfig = await mapConfig();
   next();
 });
 

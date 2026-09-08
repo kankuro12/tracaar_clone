@@ -34,7 +34,7 @@
         const r = await api('/api/routes/optimize', { method: 'POST', body: JSON.stringify({ waypoints: wps }) });
         result.html(`<div class="alert alert-success py-2 font-monospace small mb-0">Optimal order: ${r.order.join(' → ')} · Total: ${r.totalKm} km (straight-line)</div>`);
         const m = L.map('route-map').setView(r.points[0], 12);
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '&copy; OpenStreetMap' }).addTo(m);
+        baseLayer(m);
         L.polyline(r.points, { color: '#3b82f6', weight: 4 }).addTo(m);
         r.points.forEach((p, i) => L.circleMarker(p, { radius: 6, color: i === 0 ? '#f59e0b' : '#10b981', fillColor: i === 0 ? '#f59e0b' : '#10b981', fillOpacity: 0.9 }).addTo(m).bindTooltip(`Stop ${i + 1}`));
         m.fitBounds(r.points, { padding: [30, 30] });
