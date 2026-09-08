@@ -407,8 +407,8 @@ a { color: var(--primary); }
 .veh.online .pulse {
   position: absolute;
   left: 50%; top: 60%;
-  width: 24px; height: 24px;
-  margin: -12px 0 0 -12px;
+  width: 20px; height: 20px;
+  margin: -10px 0 0 -10px;
   border-radius: 50%;
   border: 2px solid currentColor;
   animation: pulse 2s ease-out infinite;
@@ -427,7 +427,7 @@ a { color: var(--primary); }
 }
 
 /* trail */
-.trail { stroke: var(--teal); stroke-width: 3; stroke-opacity: 0.85; stroke-dasharray: 6 6; }
+.trail { stroke: var(--teal); stroke-width: 3; stroke-opacity: 0.9; stroke-dasharray: 10 9; }
 
 /* geofence zones */
 .geofence {

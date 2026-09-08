@@ -174,8 +174,8 @@ window.vehicleMarkerHtml = function (type, cls, heading, extra) {
        + `${extra || ''}</div>`;
 };
 
-window.VEHICLE_MARKER_SIZE = [20, 31];
-window.VEHICLE_MARKER_ANCHOR = [10, 19];   // the position sits at the body centre
+window.VEHICLE_MARKER_SIZE = [17, 26];
+window.VEHICLE_MARKER_ANCHOR = [9, 16];    // the position sits at the body centre
 
 window.vehicleTypeLabel = function (type) {
   const found = window.VEHICLE_TYPES.find((t) => t[0] === type);

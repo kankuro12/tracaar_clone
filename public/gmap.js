@@ -14,7 +14,7 @@
   // Google draws vectors to canvas, so Leaflet CSS classes cannot style them.
   // These mirror .trail / .geofence in style.css, including the dash pattern.
   const CLASS_STYLE = {
-    trail: { strokeColor: '#10b981', strokeWeight: 3, strokeOpacity: 0.85, dash: [6, 6] },
+    trail: { strokeColor: '#10b981', strokeWeight: 3, strokeOpacity: 0.9, dash: [10, 9] },
     geofence: { strokeColor: '#f59e0b', strokeWeight: 1.5, strokeOpacity: 0.9, fillColor: '#f59e0b', fillOpacity: 0.12 },
   };
 
