@@ -26,16 +26,23 @@ function fail(provider, message) {
 
 async function googleSession(key) {
   if (session && session.expiresAt > Date.now() + 60_000) return session.token;
+  // A referrer-restricted key rejects this server-side call, which carries no
+  // Referer of its own — GOOGLE_MAPS_REFERRER supplies one of the allowed origins.
+  const referrer = process.env.GOOGLE_MAPS_REFERRER;
   const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(referrer && { referer: referrer }) },
     body: JSON.stringify({
       mapType: process.env.GOOGLE_MAPS_MAP_TYPE || 'roadmap',
       language: process.env.GOOGLE_MAPS_LANGUAGE || 'en-US',
       region: process.env.GOOGLE_MAPS_REGION || 'NP',
     }),
   });
-  if (!res.ok) throw new Error(`Google createSession failed (HTTP ${res.status}): ${(await res.text()).slice(0, 200)}`);
+  if (!res.ok) {
+    const detail = (await res.text()).slice(0, 200);
+    const hint = /referer/i.test(detail) && !referrer ? ' — set GOOGLE_MAPS_REFERRER to an allowed origin' : '';
+    throw new Error(`Google createSession failed (HTTP ${res.status}): ${detail}${hint}`);
+  }
   const body = await res.json();
   if (!body.session) throw new Error('Google createSession returned no session token');
   session = { token: body.session, expiresAt: +body.expiry * 1000 };
