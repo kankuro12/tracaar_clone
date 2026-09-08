@@ -389,10 +389,10 @@ a { color: var(--primary); }
    come through currentColor, which the SVG body and its window cut-outs use. */
 .veh {
   position: relative;
-  width: 26px; height: 40px;
+  width: 100%; height: 100%;        /* fills the icon box - see VEHICLE_MARKER_SIZE */
   color: var(--teal);
 }
-.veh.selected { color: var(--amber); width: 30px; height: 46px; }
+.veh.selected { color: var(--amber); }
 .veh.offline  { color: var(--faint); opacity: 0.55; }
 
 .veh-body {
@@ -407,8 +407,8 @@ a { color: var(--primary); }
 .veh.online .pulse {
   position: absolute;
   left: 50%; top: 60%;
-  width: 30px; height: 30px;
-  margin: -15px 0 0 -15px;
+  width: 24px; height: 24px;
+  margin: -12px 0 0 -12px;
   border-radius: 50%;
   border: 2px solid currentColor;
   animation: pulse 2s ease-out infinite;

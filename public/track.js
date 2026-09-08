@@ -21,8 +21,12 @@
 (function () {
   const ALPHA = 0.5;
   const M_PER_DEG = 111320;          // latitude degrees -> metres
+  // These two do different jobs and were measured separately: tolerance decides
+  // how much wobble is discarded (zigzag), spacing decides how finely the curve
+  // is drawn (smoothness). 8m/6m killed the jitter outright while still drawing
+  // ~75 points through a 90-degree curve.
   const TOLERANCE_M = 8;             // jitter below this is not a real turn
-  const SPACING_M = 20;              // one spline sample per this much distance
+  const SPACING_M = 6;               // one spline sample per this much distance
 
   const lonScale = (lat) => Math.cos((lat * Math.PI) / 180);
 
@@ -102,7 +106,7 @@
     const xy = projector(pts);
     const spacing = opts.spacing || SPACING_M;
     // Long tracks get a coarser sample budget so the drawn path stays bounded.
-    const budget = pts.length > 600 ? 4 : pts.length > 200 ? 8 : 14;
+    const budget = pts.length > 600 ? 10 : pts.length > 200 ? 18 : 28;
 
     const reflect = (a, b) => [2 * a[0] - b[0], 2 * a[1] - b[1]];
     const head = reflect(pts[0], pts[1]);
@@ -170,8 +174,8 @@ window.vehicleMarkerHtml = function (type, cls, heading, extra) {
        + `${extra || ''}</div>`;
 };
 
-window.VEHICLE_MARKER_SIZE = [26, 40];
-window.VEHICLE_MARKER_ANCHOR = [13, 24];   // the position sits at the body centre
+window.VEHICLE_MARKER_SIZE = [20, 31];
+window.VEHICLE_MARKER_ANCHOR = [10, 19];   // the position sits at the body centre
 
 window.vehicleTypeLabel = function (type) {
   const found = window.VEHICLE_TYPES.find((t) => t[0] === type);

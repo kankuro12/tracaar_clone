@@ -12,20 +12,24 @@
   const ll = (p) => (Array.isArray(p) ? { lat: +p[0], lng: +p[1] } : { lat: +p.lat, lng: +(p.lng != null ? p.lng : p.lon) });
 
   // Google draws vectors to canvas, so Leaflet CSS classes cannot style them.
-  // These mirror .trail / .geofence in style.css.
+  // These mirror .trail / .geofence in style.css, including the dash pattern.
   const CLASS_STYLE = {
-    trail: { strokeColor: '#10b981', strokeWeight: 3, strokeOpacity: 0.85 },
+    trail: { strokeColor: '#10b981', strokeWeight: 3, strokeOpacity: 0.85, dash: [6, 6] },
     geofence: { strokeColor: '#f59e0b', strokeWeight: 1.5, strokeOpacity: 0.9, fillColor: '#f59e0b', fillOpacity: 0.12 },
   };
 
+  // Per-call options apply first, then the className's style overrides them -
+  // under Leaflet the CSS rule beat the inline stroke attributes, so a trail was
+  // teal and dashed regardless of the color/weight the caller passed.
   function vectorStyle(o) {
     o = o || {};
-    const s = Object.assign({ strokeColor: '#3b82f6', strokeWeight: 3, strokeOpacity: 0.9, fillOpacity: 0 }, CLASS_STYLE[o.className]);
+    const s = { strokeColor: '#3b82f6', strokeWeight: 3, strokeOpacity: 0.9, fillOpacity: 0 };
     if (o.color) s.strokeColor = o.color;
     if (o.weight != null) s.strokeWeight = o.weight;
     if (o.opacity != null) s.strokeOpacity = o.opacity;
     if (o.fillColor) s.fillColor = o.fillColor;
     if (o.fillOpacity != null) s.fillOpacity = o.fillOpacity;
+    Object.assign(s, CLASS_STYLE[o.className]);
     s.clickable = o.interactive !== false;
     return s;
   }
@@ -138,18 +142,17 @@
     return self;
   }
 
-  // Leaflet dashed .trail via CSS stroke-dasharray; a canvas polyline needs a
-  // repeating symbol instead. Keyed by className to mirror style.css.
-  const DASH = { trail: [6, 6] };
-
-  function dashed(style, className) {
-    const d = DASH[className];
-    if (!d) return style;
+  // CSS stroke-dasharray has no canvas equivalent; a repeating line symbol does
+  // the same job. The solid stroke is switched off and the dashes drawn as icons.
+  function dashed(style) {
+    if (!style.dash) return style;
+    const [on, off] = style.dash;
     const s = Object.assign({}, style, { strokeOpacity: 0 });
+    delete s.dash;
     s.icons = [{
-      icon: { path: `M 0,0 0,${d[0]}`, strokeColor: style.strokeColor, strokeOpacity: style.strokeOpacity, strokeWeight: style.strokeWeight },
+      icon: { path: `M 0,0 0,${on}`, strokeColor: style.strokeColor, strokeOpacity: style.strokeOpacity, strokeWeight: style.strokeWeight },
       offset: '0',
-      repeat: `${d[0] + d[1]}px`,
+      repeat: `${on + off}px`,
     }];
     return s;
   }
@@ -157,7 +160,7 @@
   function Polyline(pts, opts) {
     opts = opts || {};
     const path = (pts || []).map(ll);
-    const shape = new (gm().Polyline)(Object.assign({ path }, dashed(vectorStyle(opts), opts.className)));
+    const shape = new (gm().Polyline)(Object.assign({ path }, dashed(vectorStyle(opts))));
     const self = wrap(shape);
     self.getLatLngs = () => path;
     self.setLatLngs = (next) => {
@@ -181,7 +184,9 @@
 
   function Circle(pos, opts) {
     opts = opts || {};
-    return wrap(new (gm().Circle)(Object.assign({ center: ll(pos), radius: opts.radius }, vectorStyle(opts))));
+    const style = vectorStyle(opts);
+    delete style.dash;   // Google circles cannot be dashed
+    return wrap(new (gm().Circle)(Object.assign({ center: ll(pos), radius: opts.radius }, style)));
   }
 
   // Leaflet circleMarker radius is pixels, so this is a scaled symbol, not a Circle.
