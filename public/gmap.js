@@ -219,7 +219,13 @@
       if (zoom != null) self._gmap.setZoom(zoom);
       return self;
     };
-    self.panTo = (pos) => { self._gmap.panTo(ll(pos)); return self; };
+    self.panTo = (pos, opts) => {
+      // Follow mode passes { animate:false } so the vehicle stays locked under
+      // the rotated map; animated panTo otherwise makes heading mode drift/jitter.
+      if (opts && opts.animate === false) self._gmap.setCenter(ll(pos));
+      else self._gmap.panTo(ll(pos));
+      return self;
+    };
     self.setZoom = (z) => { self._gmap.setZoom(z); return self; };
     self.getZoom = () => self._gmap.getZoom();
     self.fitBounds = (bounds, opts) => {
