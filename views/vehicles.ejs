@@ -12,17 +12,25 @@
         <div class="card-body p-4">
           <h2 class="h6 text-uppercase text-body-secondary font-monospace fw-bold mb-3" style="font-size: 11px; letter-spacing: 0.05em;">Register vehicle</h2>
           <form id="create-vehicle" class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label text-body-secondary small font-medium">Name</label>
               <input class="form-control" name="name" required placeholder="e.g. Bus 101">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label text-body-secondary small font-medium">IMEI</label>
               <input class="form-control font-monospace" name="imei" required placeholder="15 digits">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-3">
               <label class="form-label text-body-secondary small font-medium">Plate</label>
               <input class="form-control" name="plate" placeholder="BA 1 PA 1234">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label text-body-secondary small font-medium" for="new-type">Type</label>
+              <select class="form-select" name="type" id="new-type">
+                <% VEHICLE_TYPES.forEach(([value, label]) => { %>
+                  <option value="<%= value %>" <%= value === 'car' ? 'selected' : '' %>><%= label %></option>
+                <% }) %>
+              </select>
             </div>
             <div class="col-12 mt-3">
               <button class="btn btn-primary bg-gradient d-inline-flex align-items-center gap-2 px-4 py-2 font-medium" type="submit">
@@ -40,6 +48,7 @@
             <thead>
               <tr>
                 <th>Name</th>
+                <th>Type</th>
                 <th>Plate</th>
                 <th>Status</th>
                 <th>IMEI</th>
@@ -50,11 +59,18 @@
             </thead>
             <tbody>
               <% if (!vehicles.length) { %>
-              <tr><td colspan="7" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
+              <tr><td colspan="8" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
               <% } %>
               <% vehicles.forEach((v) => { %>
               <tr>
                 <td class="fw-semibold"><%= v.name %></td>
+                <td>
+                  <select class="form-select form-select-sm vehicle-type" data-vid="<%= v.id %>" style="width: auto" aria-label="Vehicle type for <%= v.name %>">
+                    <% VEHICLE_TYPES.forEach(([value, label]) => { %>
+                      <option value="<%= value %>" <%= v.type === value ? 'selected' : '' %>><%= label %></option>
+                    <% }) %>
+                  </select>
+                </td>
                 <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= v.plate || '—' %></span></td>
                 <td><%- include('partials/ignition', { ignition: v.ignition }) %></td>
                 <td class="font-monospace small text-body-secondary"><%= v.imei %></td>
@@ -125,7 +141,7 @@
     $('#create-vehicle').on('submit', async (e) => {
       e.preventDefault();
       const f = new FormData(e.target);
-      try { await api('/api/vehicles', { method: 'POST', body: JSON.stringify({ name: f.get('name'), imei: f.get('imei'), plate: f.get('plate') }) }); location.reload(); }
+      try { await api('/api/vehicles', { method: 'POST', body: JSON.stringify({ name: f.get('name'), imei: f.get('imei'), plate: f.get('plate'), type: f.get('type') }) }); location.reload(); }
       catch (err) { showErr(e.target, err.message); }
     });
     $('.assign-form').on('submit', async (e) => {
@@ -134,6 +150,17 @@
       try { await api(`/api/vehicles/${form.dataset.vid}/assign`, { method: 'POST', body: JSON.stringify({ userId: +$(form).find('.assign-user').val() }) }); location.reload(); }
       catch (err) { showErr(form, err.message); }
     });
+    $('.vehicle-type').on('change', async function () {
+      const prev = this.dataset.prev || '';
+      try {
+        await api(`/api/vehicles/${this.dataset.vid}/type`, { method: 'PATCH', body: JSON.stringify({ type: this.value }) });
+        this.dataset.prev = this.value;
+      } catch (err) {
+        if (prev) this.value = prev;
+        showErr(this.closest('tr'), err.message);
+      }
+    });
+    $('.vehicle-type').each(function () { this.dataset.prev = this.value; });
     $('[data-dest]').on('click', function () {
       destVid = this.dataset.dest;
       $('#dest-title').text(`Destination for ${this.dataset.name}`);

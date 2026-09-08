@@ -173,6 +173,7 @@
     let vehicleMarker = null;
     let markerArrow = null;
     let trailPolyline = null;
+    let trailPts = [];   // raw fixes; trailPolyline draws the smoothed version
     let destMarker = null;
     let geofenceLayers = [];
     let ws = null;
@@ -209,9 +210,9 @@
       const arrow = `<span class="arrow" style="transform: rotate(${course}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>`;
       return L.divIcon({
         className: '',
-        html: `<div class="marker-dot selected ${cls}" style="width: 22px; height: 22px;">${arrow}${inner}</div>`,
-        iconSize: [22, 22],
-        iconAnchor: [11, 11]
+        html: `<div class="marker-dot selected ${cls}">${vehicleGlyph(vehicle.type)}${arrow}${inner}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15]
       });
     }
 
@@ -369,6 +370,7 @@
     async function loadTrail() {
       if (trailPolyline) trailPolyline.remove();
       trailPolyline = null;
+      trailPts = [];
       try {
         const r = await fetch(`/api/vehicles/${vehicle.id}/positions?from=${encodeURIComponent(new Date(Date.now() - TRAIL_MS).toISOString())}`, {
           headers: { Authorization: `Bearer ${token}` }
@@ -376,7 +378,8 @@
         if (!r.ok) return;
         const pts = (await r.json()).filter((p) => p.valid).map((p) => [p.lat, p.lon]);
         if (pts.length > 1) {
-          trailPolyline = L.polyline(pts, { className: 'trail', color: '#3b82f6', weight: 4, opacity: 0.85 }).addTo(map);
+          trailPts = pts;
+          trailPolyline = L.polyline(smoothTrack(pts), { className: 'trail', color: '#3b82f6', weight: 4, opacity: 0.85 }).addTo(map);
           if (!showTrail) trailPolyline.remove();
         }
       } catch (err) {
@@ -466,8 +469,9 @@
         }
 
         if (showTrail) {
-          if (trailPolyline) trailPolyline.addLatLng([pos.lat, pos.lon]);
-          else trailPolyline = L.polyline([[pos.lat, pos.lon]], { className: 'trail', color: '#3b82f6', weight: 4 }).addTo(map);
+          trailPts.push([pos.lat, pos.lon]);
+          if (trailPolyline) trailPolyline.setLatLngs(smoothTrack(trailPts));
+          else trailPolyline = L.polyline(smoothTrack(trailPts), { className: 'trail', color: '#3b82f6', weight: 4 }).addTo(map);
         }
       };
 

@@ -16,6 +16,7 @@ const state = {
   selected: new Set(),
   markers: new Map(),  // id -> leaflet marker
   trail: null,
+  trailPts: [],   // raw fixes; the drawn line is the smoothed version of these
   geofences: [],
   banners: [],
 };
@@ -43,7 +44,7 @@ function markerIcon(v, selected) {
   const inner = isOnline(v) ? '<span class="pulse"></span>' : '';
   const arrow = v.position && (v.position.course != null || anim.has(v.id))
     ? `<span class="arrow" style="transform: rotate(${(anim.get(v.id)?.headingDeg ?? v.position.course) ?? 0}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>` : '';
-  return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${arrow}${inner}</div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+  return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${vehicleGlyph(v.type)}${arrow}${inner}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
 }
 
 /* ---------- sidebar ---------- */
@@ -112,7 +113,7 @@ function applySelection() {
     drawTrail(id);
     focus(id);
   } else {
-    if (state.trail) { state.trail.remove(); state.trail = null; }
+    if (state.trail) { state.trail.remove(); state.trail = null; state.trailPts = []; }
     if (state.selected.size > 1) fitTo(state.selected);
     else fitTo(new Set(state.vehicles.keys()));
   }
@@ -125,13 +126,15 @@ function applySelection() {
 async function drawTrail(id) {
   if (state.trail) state.trail.remove();
   state.trail = null;
+  state.trailPts = [];
   const r = await fetch(`/api/vehicles/${id}/positions?from=${encodeURIComponent(new Date(Date.now() - TRAIL_MS).toISOString())}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!r.ok) return;
   const pts = (await r.json()).filter((p) => p.valid).map((p) => [p.lat, p.lon]);
   if (pts.length > 1) {
-    state.trail = L.polyline(pts, { className: 'trail', interactive: false }).addTo(map);
+    state.trailPts = pts;
+    state.trail = L.polyline(smoothTrack(pts), { className: 'trail', interactive: false }).addTo(map);
   }
 }
 
@@ -385,7 +388,10 @@ function connectWs() {
     setMarkerIcon(v.id);
     m.setPopupContent(popupHtml(v));
     if (state.selected.has(v.id) && state.selected.size === 1) {
-      if (state.trail) state.trail.addLatLng([msg.position.lat, msg.position.lon]);
+      if (state.trail) {
+        state.trailPts.push([msg.position.lat, msg.position.lon]);
+        state.trail.setLatLngs(smoothTrack(state.trailPts));
+      }
       else drawTrail(v.id);
     }
     renderSidebar();

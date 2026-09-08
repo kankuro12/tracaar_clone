@@ -11,6 +11,14 @@ const { mapConfig } = require('./maps');
 
 const router = Router();
 const PER_PAGE = 25;
+// Mirrors VEHICLE_TYPES in public/track.js and the CHECK in migration 006.
+const VEHICLE_TYPES = [
+  ['bike', 'Bike'],
+  ['car', 'Car'],
+  ['bus', 'Bus'],
+  ['truck', 'Truck'],
+  ['three_wheeler', 'Three wheeler'],
+];
 const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, keyFn: (req) => `web-login:${req.ip}` });
 
 const NAV = {
@@ -72,6 +80,7 @@ router.use(async (req, res, next) => {
   res.locals.user = req.session && req.session.user;
   res.locals.nav = res.locals.user ? NAV[res.locals.user.role] || [] : [];
   res.locals.mapConfig = await mapConfig();
+  res.locals.VEHICLE_TYPES = VEHICLE_TYPES;
   next();
 });
 
@@ -356,14 +365,14 @@ router.get('/admin/vehicles/:id/positions', loadUser, rolePage('admin'), async (
 router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'), async (req, res) => {
   let vQuery, vParams;
   if (req.user.role === 'super_admin') {
-    vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+    vQuery = `SELECT v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon,
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
               LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
               WHERE v.id = $1`;
     vParams = [req.params.id];
   } else {
-    vQuery = `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+    vQuery = `SELECT v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon,
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
               LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
@@ -377,6 +386,7 @@ router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'
     id: row.id,
     name: row.name,
     plate: row.plate,
+    type: row.type,
     imei: row.imei,
     destination: row.dest_lat != null ? { lat: row.dest_lat, lon: row.dest_lon } : null,
     position: row.position_id ? {

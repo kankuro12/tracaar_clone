@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS vehicles (
   imei        TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
   plate       TEXT NOT NULL DEFAULT '',
+  type        TEXT NOT NULL DEFAULT 'car'
+                CHECK (type IN ('bike','car','bus','truck','three_wheeler')),
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   dest_lat    DOUBLE PRECISION,
   dest_lon    DOUBLE PRECISION

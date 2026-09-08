@@ -9,6 +9,10 @@ const { recordPayment, changePlanProrated, revenueSummary, previewInvoice } = re
 
 const router = Router();
 
+// Vehicle classes - drives the map marker glyph. Mirrors the CHECK constraint in
+// db/migrations/006_vehicle_type.sql and VEHICLE_TYPES in public/track.js.
+const VEHICLE_TYPES = ['bike', 'car', 'bus', 'truck', 'three_wheeler'];
+
 // brute-force guard: 10 attempts / 5 min per IP, keyed separately per route
 // so hammering one doesn't burn the budget for the other.
 const loginLimiter = rateLimit({ windowMs: 5 * 60 * 1000, max: 10, keyFn: (req) => `login:${req.ip}` });
@@ -83,15 +87,16 @@ router.post('/users', auth, requireRole('admin'), async (req, res) => {
 
 // ---- Vehicles ----
 router.post('/vehicles', auth, requireRole('admin'), async (req, res) => {
-  const { name, imei, plate } = req.body || {};
+  const { name, imei, plate, type } = req.body || {};
   if (!name || !imei) return res.status(400).json({ error: 'name and imei required' });
+  if (type && !VEHICLE_TYPES.includes(type)) return res.status(400).json({ error: `type must be one of ${VEHICLE_TYPES.join(', ')}` });
   const limit = await vehicleLimitReached(req.user.customerId);
   if (limit != null) return res.status(403).json({ error: `plan limit reached (${limit} vehicles) — upgrade your plan to add more` });
   try {
     const r = await pool.query(
-      `INSERT INTO vehicles (customer_id, imei, name, plate) VALUES ($1, $2, $3, $4)
-       RETURNING id, imei, name, plate`,
-      [req.user.customerId, String(imei).trim(), name, plate || '']
+      `INSERT INTO vehicles (customer_id, imei, name, plate, type) VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, imei, name, plate, type`,
+      [req.user.customerId, String(imei).trim(), name, plate || '', type || 'car']
     );
     invalidateVehicleCache(String(imei).trim());
     res.status(201).json(r.rows[0]);
@@ -104,7 +109,7 @@ router.post('/vehicles', auth, requireRole('admin'), async (req, res) => {
 router.get('/vehicles', auth, async (req, res) => {
   const rows = await latestPositions(req.user);
   res.json(rows.map((r) => ({
-    id: r.id, name: r.name, plate: r.plate, imei: r.imei,
+    id: r.id, name: r.name, plate: r.plate, type: r.type, imei: r.imei,
     destination: r.dest_lat != null ? { lat: r.dest_lat, lon: r.dest_lon } : null,
     position: r.position_id ? {
       id: r.position_id, recordedAt: r.recorded_at, deviceTime: r.device_time,
@@ -119,7 +124,7 @@ router.get('/vehicles/:id', auth, async (req, res) => {
     return res.status(403).json({ error: 'not allowed to see this vehicle' });
   }
   const r = await pool.query(
-    `SELECT v.id, v.name, v.plate, v.imei, v.dest_lat, v.dest_lon,
+    `SELECT v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon,
             p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
      FROM vehicles v
      LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
@@ -132,6 +137,7 @@ router.get('/vehicles/:id', auth, async (req, res) => {
     id: row.id,
     name: row.name,
     plate: row.plate,
+    type: row.type,
     imei: row.imei,
     destination: row.dest_lat != null ? { lat: row.dest_lat, lon: row.dest_lon } : null,
     position: row.position_id ? {
@@ -249,6 +255,16 @@ router.patch('/vehicles/:id/destination', auth, requireRole('admin'), async (req
     }
     await pool.query('UPDATE vehicles SET dest_lat = $2, dest_lon = $3 WHERE id = $1', [v.id, lat, lon]);
   }
+  res.status(204).end();
+});
+
+// ---- Vehicle type ----
+router.patch('/vehicles/:id/type', auth, requireRole('admin'), async (req, res) => {
+  const v = await tenantVehicle(req, res);
+  if (!v) return;
+  const type = req.body && req.body.type;
+  if (!VEHICLE_TYPES.includes(type)) return res.status(400).json({ error: `type must be one of ${VEHICLE_TYPES.join(', ')}` });
+  await pool.query('UPDATE vehicles SET type = $2 WHERE id = $1', [v.id, type]);
   res.status(204).end();
 });
 
