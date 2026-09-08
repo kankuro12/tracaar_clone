@@ -42,9 +42,8 @@ const isOnline = (v) => v.position && Date.now() - new Date(v.position.recordedA
 function markerIcon(v, selected) {
   const cls = selected ? 'selected' : isOnline(v) ? 'online' : 'offline';
   const inner = isOnline(v) ? '<span class="pulse"></span>' : '';
-  const arrow = v.position && (v.position.course != null || anim.has(v.id))
-    ? `<span class="arrow" style="transform: rotate(${(anim.get(v.id)?.headingDeg ?? v.position.course) ?? 0}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>` : '';
-  return L.divIcon({ className: '', html: `<div class="marker-dot ${cls}">${vehicleGlyph(v.type)}${arrow}${inner}</div>`, iconSize: [26, 26], iconAnchor: [13, 13] });
+  const heading = (anim.get(v.id)?.headingDeg ?? (v.position && v.position.course)) ?? 0;
+  return L.divIcon({ className: '', html: vehicleMarkerHtml(v.type, cls, heading, inner), iconSize: VEHICLE_MARKER_SIZE, iconAnchor: VEHICLE_MARKER_ANCHOR });
 }
 
 /* ---------- sidebar ---------- */
@@ -259,7 +258,7 @@ const MOTION = {
 };
 
 const anim = new Map();   // id -> { pos, last, tween, heading, headingDeg, prevFix }
-const arrows = new Map(); // id -> .arrow element (invalidated on every setIcon)
+const arrows = new Map(); // id -> .veh-body element (invalidated on every setIcon)
 
 const shortestAngle = (from, to) => ((to - from + 540) % 360) - 180;
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
@@ -273,7 +272,7 @@ function setRotation(id, deg) {
   let el = arrows.get(id);
   if (!el) {
     const m = state.markers.get(id);
-    el = m && m._icon && m._icon.querySelector('.arrow');
+    el = m && m._icon && m._icon.querySelector('.veh-body');
     if (!el) return;
     arrows.set(id, el);
   }

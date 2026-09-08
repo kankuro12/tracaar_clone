@@ -207,12 +207,11 @@
       const cls = online ? 'online' : 'offline';
       const inner = online ? '<span class="pulse"></span>' : '';
       const course = pos && pos.course != null ? pos.course : 0;
-      const arrow = `<span class="arrow" style="transform: rotate(${course}deg)"><svg viewBox="0 0 12 18"><path d="M6 0 L12 8 H8.5 V18 H3.5 V8 H0 Z"/></svg></span>`;
       return L.divIcon({
         className: '',
-        html: `<div class="marker-dot selected ${cls}">${vehicleGlyph(vehicle.type)}${arrow}${inner}</div>`,
-        iconSize: [30, 30],
-        iconAnchor: [15, 15]
+        html: vehicleMarkerHtml(vehicle.type, `selected ${cls}`, course, inner),
+        iconSize: VEHICLE_MARKER_SIZE,
+        iconAnchor: VEHICLE_MARKER_ANCHOR
       });
     }
 
@@ -465,7 +464,7 @@
 
         if (vehicleMarker) {
           vehicleMarker.setIcon(createMarkerIcon(pos));
-          markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.arrow') : null;
+          markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.veh-body') : null;
         }
 
         if (showTrail) {
@@ -520,7 +519,7 @@
           icon: createMarkerIcon(vehicle.position),
           interactive: true
         }).addTo(map);
-        markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.arrow') : null;
+        markerArrow = vehicleMarker.getElement() ? vehicleMarker.getElement().querySelector('.veh-body') : null;
         onFix(vehicle.position);
         updateHud(vehicle.position);
       } else {
