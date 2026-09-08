@@ -238,6 +238,13 @@
       }
       return self;
     };
+    // Leaflet API surface used by the map pages' rotate-heading control.
+    // Google's map is draggable by default; disable() freezes it while the
+    // container is CSS-rotated (drag math would otherwise fight the rotation).
+    self.dragging = {
+      enable: () => self._gmap.setOptions({ draggable: true }),
+      disable: () => self._gmap.setOptions({ draggable: false }),
+    };
     self.on = () => self;
     window.__mapContainers.push(self._el);
     return self;
