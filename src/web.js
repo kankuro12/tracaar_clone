@@ -3,7 +3,7 @@
 // the session cookie, so page forms just fetch /api with no token handling.
 const { Router } = require('express');
 const bcrypt = require('bcryptjs');
-const { pool, latestPositions, canSeeVehicle } = require('./db');
+const { pool, latestPositions, canSeeVehicle, getLiveMapPrefs } = require('./db');
 const { sign } = require('./auth');
 const { rateLimit } = require('./ratelimit');
 const { revenueSummary } = require('./billing');
@@ -139,7 +139,7 @@ router.get('/app', loadUser, (req, res) => {
 // ---- customer portal ----
 const { latestPositions: _latest, reportSummary: _summary } = require('./db');
 router.get('/portal', loadUser, rolePage('admin', 'user'), async (req, res) => {
-  const vehicles = await _latest(req.user);
+  const vehicles = await _latest(req.user, { dashboard: true });
   const online = vehicles.filter((v) => v.recorded_at && Date.now() - new Date(v.recorded_at).getTime() < 3 * 60 * 1000).length;
   const alerts = await pool.query(
     req.user.role === 'admin'
@@ -197,7 +197,7 @@ router.get('/admin/customers/:id', loadUser, rolePage('super_admin'), async (req
        FROM vehicles v
        LEFT JOIN LATERAL (SELECT device_time FROM positions p WHERE p.vehicle_id = v.id
                           ORDER BY p.device_time DESC LIMIT 1) p ON TRUE
-       WHERE v.customer_id = $1 ORDER BY v.id`, [req.params.id]),
+       WHERE v.customer_id = $1 AND v.deleted_at IS NULL ORDER BY v.id`, [req.params.id]),
     pool.query('SELECT id, customer_id, role, email, name, created_at FROM users WHERE customer_id = $1 ORDER BY id', [req.params.id]),
   ]);
   res.render('customer', { customer: c.rows[0], vehicles: vehicles.rows, users: users.rows, active: 'customers' });
@@ -215,7 +215,7 @@ router.get('/admin/:page', loadUser, async (req, res) => {
       pool.query(
         `SELECT c.id, c.name, c.plan_id, c.alert_email, c.alert_webhook, c.created_at,
                 p.name AS plan, p.price_monthly,
-                (SELECT count(*) FROM vehicles v WHERE v.customer_id = c.id) AS vehicle_count,
+                (SELECT count(*) FROM vehicles v WHERE v.customer_id = c.id AND v.deleted_at IS NULL) AS vehicle_count,
                 (SELECT count(*) FROM users u WHERE u.customer_id = c.id) AS user_count
          FROM customers c LEFT JOIN plans p ON p.id = c.plan_id ORDER BY c.id`),
       pool.query('SELECT * FROM plans ORDER BY price_monthly'),
@@ -231,7 +231,7 @@ router.get('/admin/:page', loadUser, async (req, res) => {
     return res.render('users', { users: users.rows, active: page });
   }
   if (page === 'vehicles') {
-    const [vehicles, users, assigned] = await Promise.all([
+    const [vehicles, users, assigned, trashed] = await Promise.all([
       latestPositions(req.user),
       pool.query('SELECT id, name FROM users WHERE customer_id = $1 ORDER BY id', [req.user.customerId]),
       pool.query(
@@ -239,9 +239,10 @@ router.get('/admin/:page', loadUser, async (req, res) => {
          FROM vehicle_user vu JOIN vehicles v ON v.id = vu.vehicle_id
          JOIN users u ON u.id = vu.user_id
          WHERE v.customer_id = $1 GROUP BY v.id`, [req.user.customerId]),
+      pool.query('SELECT count(*) FROM vehicles WHERE customer_id = $1 AND deleted_at IS NOT NULL', [req.user.customerId]),
     ]);
     const assignedMap = Object.fromEntries(assigned.rows.map((r) => [r.vehicle_id, r.users]));
-    return res.render('vehicles', { vehicles, users: users.rows, assignedMap, active: page });
+    return res.render('vehicles', { vehicles, users: users.rows, assignedMap, trashedCount: +trashed.rows[0].count, active: page });
   }
   if (page === 'geofences') {
     const [geofences, vehicles] = await Promise.all([
@@ -249,7 +250,7 @@ router.get('/admin/:page', loadUser, async (req, res) => {
         `SELECT g.id, g.name, g.radius_m,
                 ST_Y(g.center::geometry) AS lat, ST_X(g.center::geometry) AS lon
          FROM geofences g WHERE g.customer_id = $1 ORDER BY g.id`, [req.user.customerId]),
-      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 ORDER BY id', [req.user.customerId]),
+      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 AND deleted_at IS NULL ORDER BY id', [req.user.customerId]),
     ]);
     const veh = await pool.query('SELECT geofence_id, array_agg(vehicle_id) AS vehicle_ids FROM vehicle_geofence GROUP BY 1');
     const byId = Object.fromEntries(veh.rows.map((r) => [r.geofence_id, r.vehicle_ids]));
@@ -268,15 +269,15 @@ router.get('/admin/:page', loadUser, async (req, res) => {
   if (page === 'integration') {
     const [keys, vehicles] = await Promise.all([
       pool.query('SELECT id, name, client_id, created_at, revoked_at FROM integration_keys WHERE customer_id = $1 ORDER BY id', [req.user.customerId]),
-      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 ORDER BY id', [req.user.customerId]),
+      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 AND deleted_at IS NULL ORDER BY id', [req.user.customerId]),
     ]);
     return res.render('integration', { keys: keys.rows, vehicles: vehicles.rows, active: page });
   }
   if (page === 'drivers') {
     const [drivers, vehicles] = await Promise.all([
-      pool.query(`SELECT d.*, (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id) AS vehicle_count
+      pool.query(`SELECT d.*, (SELECT count(*) FROM vehicles v WHERE v.driver_id = d.id AND v.deleted_at IS NULL) AS vehicle_count
                     FROM drivers d WHERE d.customer_id = $1 ORDER BY d.name`, [req.user.customerId]),
-      pool.query('SELECT id, name, driver_id FROM vehicles WHERE customer_id = $1 ORDER BY name', [req.user.customerId]),
+      pool.query('SELECT id, name, driver_id FROM vehicles WHERE customer_id = $1 AND deleted_at IS NULL ORDER BY name', [req.user.customerId]),
     ]);
     return res.render('drivers', { drivers: drivers.rows, vehicles: vehicles.rows, active: page });
   }
@@ -286,7 +287,7 @@ router.get('/admin/:page', loadUser, async (req, res) => {
                     JOIN vehicles v ON v.id = m.vehicle_id
                    WHERE m.customer_id = $1
                    ORDER BY (m.completed_at IS NOT NULL), m.due_date NULLS LAST, m.id DESC`, [req.user.customerId]),
-      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 ORDER BY name', [req.user.customerId]),
+      pool.query('SELECT id, name FROM vehicles WHERE customer_id = $1 AND deleted_at IS NULL ORDER BY name', [req.user.customerId]),
     ]);
     return res.render('maintenance', { items: items.rows, vehicles: vehicles.rows, active: page });
   }
@@ -349,8 +350,16 @@ router.get('/admin/behaviour', loadUser, rolePage('admin', 'super_admin'), async
 });
 
 // ---- vehicle position history (paged) ----
+router.get('/admin/vehicles/trash', loadUser, rolePage('admin'), async (req, res) => {
+  const rows = await pool.query(
+    'SELECT id, name, plate, type, imei, deleted_at FROM vehicles WHERE customer_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC',
+    [req.user.customerId]
+  );
+  res.render('vehicles-trash', { vehicles: rows.rows, active: 'vehicles' });
+});
+
 router.get('/admin/vehicles/:id/positions', loadUser, rolePage('admin'), async (req, res) => {
-  const v = await pool.query('SELECT id, name FROM vehicles WHERE id = $1 AND customer_id = $2', [req.params.id, req.user.customerId]);
+  const v = await pool.query('SELECT id, name FROM vehicles WHERE id = $1 AND customer_id = $2 AND deleted_at IS NULL', [req.params.id, req.user.customerId]);
   if (!v.rows.length) return res.status(404).render('error', { message: 'vehicle not found' });
   const q = pageQuery(req);
   const [rows, count] = await Promise.all([
@@ -369,17 +378,20 @@ router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
               LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
-              WHERE v.id = $1`;
+              WHERE v.id = $1 AND v.deleted_at IS NULL`;
     vParams = [req.params.id];
   } else {
     vQuery = `SELECT v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon,
                      p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course
               FROM vehicles v
               LEFT JOIN LATERAL (SELECT * FROM positions WHERE vehicle_id = v.id ORDER BY device_time DESC LIMIT 1) p ON TRUE
-              WHERE v.id = $1 AND v.customer_id = $2`;
+              WHERE v.id = $1 AND v.customer_id = $2 AND v.deleted_at IS NULL`;
     vParams = [req.params.id, req.user.customerId];
   }
-  const r = await pool.query(vQuery, vParams);
+  const [r, liveMapPrefs] = await Promise.all([
+    pool.query(vQuery, vParams),
+    getLiveMapPrefs(req.user.id),
+  ]);
   if (!r.rows.length) return res.status(404).render('error', { message: 'vehicle not found' });
   const row = r.rows[0];
   const vehicle = {
@@ -403,6 +415,7 @@ router.get('/admin/vehicles/:id/live', loadUser, rolePage('admin', 'super_admin'
   res.render('vehicle-live', {
     vehicle,
     token: req.session.token,
+    liveMapPrefs,
     active: 'vehicles',
   });
 });

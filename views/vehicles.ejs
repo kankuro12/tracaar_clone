@@ -5,7 +5,14 @@
     <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
       <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
         <h1 class="h4 mb-0 fw-bold">Vehicles</h1>
-        <div class="d-flex gap-2"><input class="form-control form-control-sm table-search" data-table-filter=".table" placeholder="Search…"><span class="badge text-bg-secondary px-3 py-2 font-monospace"><%= vehicles.length %> Total</span></div>
+        <div class="d-flex gap-2 align-items-center">
+          <input class="form-control form-control-sm table-search" data-table-filter=".table" placeholder="Search…">
+          <span class="badge text-bg-secondary px-3 py-2 font-monospace"><%= vehicles.length %> Total</span>
+          <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="/admin/vehicles/trash">
+            <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Trash<% if (trashedCount) { %> <span class="badge text-bg-dark ms-1"><%= trashedCount %></span><% } %>
+          </a>
+        </div>
       </div>
 
       <div class="card mb-4" style="max-width: 680px">
@@ -54,12 +61,13 @@
                 <th>IMEI</th>
                 <th>Destination</th>
                 <th>Assigned Users</th>
+                <th>Dashboard</th>
                 <th class="text-end">Actions</th>
               </tr>
             </thead>
             <tbody>
               <% if (!vehicles.length) { %>
-              <tr><td colspan="8" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
+              <tr><td colspan="9" class="text-body-secondary py-4 text-center">No vehicles registered yet.</td></tr>
               <% } %>
               <% vehicles.forEach((v) => { %>
               <tr>
@@ -86,6 +94,11 @@
                     <% (assignedMap[v.id] || []).forEach((n) => { %><span class="badge text-bg-dark border border-secondary-subtle font-sans"><%= n %></span><% }) %>
                   </div>
                 </td>
+                <td>
+                  <div class="form-check form-switch mb-0" title="Show this vehicle on the dashboard">
+                    <input class="form-check-input vehicle-dashboard-toggle" type="checkbox" role="switch" data-vid="<%= v.id %>" <%= v.hidden_from_dashboard ? '' : 'checked' %>>
+                  </div>
+                </td>
                 <td class="text-end">
                   <div class="d-inline-flex gap-2">
                     <a class="btn btn-sm btn-primary bg-gradient d-inline-flex align-items-center gap-1" href="/admin/vehicles/<%= v.id %>/live">
@@ -99,6 +112,10 @@
                     <button class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" data-dest="<%= v.id %>" data-name="<%= v.name %>">
                       <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                       Dest
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger d-inline-flex align-items-center gap-1 vehicle-trash" data-vid="<%= v.id %>" data-name="<%= v.name %>">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                      Trash
                     </button>
                   </div>
                 </td>
@@ -173,6 +190,16 @@
         await api(`/api/vehicles/${destVid}/destination`, { method: 'PATCH', body: JSON.stringify({ lat: +f.get('lat'), lon: +f.get('lon'), clear: f.get('clear') === 'on' }) });
         location.reload();
       } catch (err) { showErr(e.target, err.message); }
+    });
+    $('.vehicle-dashboard-toggle').on('change', async function () {
+      const checked = this.checked;
+      try { await api(`/api/vehicles/${this.dataset.vid}/hidden`, { method: 'PATCH', body: JSON.stringify({ hidden: !checked }) }); }
+      catch (err) { this.checked = !checked; showErr(this.closest('tr'), err.message); }
+    });
+    $('.vehicle-trash').on('click', async function () {
+      if (!confirm(`Move "${this.dataset.name}" to trash? It can be restored later from Trash.`)) return;
+      try { await api(`/api/vehicles/${this.dataset.vid}/trash`, { method: 'POST' }); location.reload(); }
+      catch (err) { showErr(this.closest('tr'), err.message); }
     });
   </script>
 </body>

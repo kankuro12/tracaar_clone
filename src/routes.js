@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole, weakPassword, MIN_PASSWORD_LEN } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached, visibleVehicleIds } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached, visibleVehicleIds, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, setLiveMapPrefs } = require('./db');
 const { rateLimit } = require('./ratelimit');
 const { invalidateRules } = require('./rules');
 const { recordPayment, changePlanProrated, revenueSummary, previewInvoice } = require('./billing');
@@ -117,6 +117,10 @@ router.get('/vehicles', auth, async (req, res) => {
       ignition: r.ignition, statusHex: r.status_hex,
     } : null,
   })));
+});
+
+router.get('/vehicles/trash', auth, requireRole('admin'), async (req, res) => {
+  res.json(await listTrashedVehicles(req.user.customerId));
 });
 
 router.get('/vehicles/:id', auth, async (req, res) => {
@@ -265,6 +269,43 @@ router.patch('/vehicles/:id/type', auth, requireRole('admin'), async (req, res) 
   const type = req.body && req.body.type;
   if (!VEHICLE_TYPES.includes(type)) return res.status(400).json({ error: `type must be one of ${VEHICLE_TYPES.join(', ')}` });
   await pool.query('UPDATE vehicles SET type = $2 WHERE id = $1', [v.id, type]);
+  res.status(204).end();
+});
+
+// ---- Per-user live-map control prefs (follow/trail/geofences), server-side
+// so they persist across browsers/devices, not just localStorage ----
+router.put('/users/me/live-map-prefs', auth, async (req, res) => {
+  const { follow, trail, geofences, rotate } = req.body || {};
+  await setLiveMapPrefs(req.user.id, {
+    follow: !!follow,
+    trail: !!trail,
+    geofences: !!geofences,
+    rotate: !!rotate,
+  });
+  res.status(204).end();
+});
+
+// ---- Vehicle trash (soft delete, restorable) & dashboard visibility ----
+router.post('/vehicles/:id/trash', auth, requireRole('admin'), async (req, res) => {
+  const v = await tenantVehicle(req, res);
+  if (!v) return;
+  const row = await trashVehicle(req.user.customerId, v.id);
+  if (!row) return res.status(404).json({ error: 'vehicle not found' });
+  res.status(204).end();
+});
+
+router.post('/vehicles/:id/restore', auth, requireRole('admin'), async (req, res) => {
+  const v = await tenantVehicle(req, res);
+  if (!v) return;
+  const row = await restoreVehicle(req.user.customerId, v.id);
+  if (!row) return res.status(404).json({ error: 'vehicle not found in trash' });
+  res.status(204).end();
+});
+
+router.patch('/vehicles/:id/hidden', auth, requireRole('admin'), async (req, res) => {
+  const v = await tenantVehicle(req, res);
+  if (!v) return;
+  await setVehicleDashboardHidden(req.user.customerId, v.id, req.body && req.body.hidden);
   res.status(204).end();
 });
 

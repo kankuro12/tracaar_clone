@@ -110,6 +110,10 @@
             <input class="form-check-input" type="checkbox" role="switch" id="toggle-geofences" checked>
             <label class="form-check-label text-body small font-medium" for="toggle-geofences">Show geofences</label>
           </div>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" role="switch" id="toggle-rotate">
+            <label class="form-check-label text-body small font-medium" for="toggle-rotate">Rotate map to vehicle heading</label>
+          </div>
           <div class="d-flex gap-2 mt-2">
             <button class="btn btn-sm btn-outline-secondary flex-grow-1 d-inline-flex align-items-center justify-content-center gap-1 font-medium" id="btn-recenter">
               <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>
@@ -149,7 +153,8 @@
     window.FLEET = {
       user: <%- JSON.stringify(user) %>,
       token: <%- JSON.stringify(token) %>,
-      vehicle: <%- JSON.stringify(vehicle) %>
+      vehicle: <%- JSON.stringify(vehicle) %>,
+      liveMapPrefs: <%- JSON.stringify(liveMapPrefs) %>
     };
   </script>
   <%- include('partials/scripts') %>
@@ -177,9 +182,45 @@
     let destMarker = null;
     let geofenceLayers = [];
     let ws = null;
-    let followVehicle = true;
-    let showTrail = true;
-    let showGeofences = true;
+
+    // Map controls persist per user server-side (survives across browsers/devices),
+    // read before the toggles below use them so the map behaves the same on reopen.
+    const savedControls = (window.FLEET && window.FLEET.liveMapPrefs) || {};
+    const saveControls = () => {
+      $.ajax({
+        url: '/api/users/me/live-map-prefs',
+        method: 'PUT',
+        contentType: 'application/json',
+        data: JSON.stringify({ follow: followVehicle, trail: showTrail, geofences: showGeofences, rotate: rotateToHeading }),
+      });
+    };
+    let followVehicle = savedControls.follow !== undefined ? savedControls.follow : true;
+    let showTrail = savedControls.trail !== undefined ? savedControls.trail : true;
+    let showGeofences = savedControls.geofences !== undefined ? savedControls.geofences : true;
+    let rotateToHeading = savedControls.rotate !== undefined ? savedControls.rotate : false;
+    document.getElementById('toggle-follow').checked = followVehicle;
+    document.getElementById('toggle-trail').checked = showTrail;
+    document.getElementById('toggle-geofences').checked = showGeofences;
+    document.getElementById('toggle-rotate').checked = rotateToHeading;
+
+    // Heading-up mode: rotate the map container opposite the vehicle's heading so
+    // it always points "up" on screen (composes with the marker's own heading
+    // rotation in tickMotion, which cancels out to point straight up). Dragging
+    // is disabled while active since Leaflet's drag math doesn't know about the
+    // CSS rotation and would otherwise feel wrong.
+    const mapEl = document.getElementById('map');
+    const mapControls = mapEl.querySelector('.leaflet-control-container');
+    function setMapRotation(active) {
+      if (!active) {
+        mapEl.style.transform = '';
+        if (mapControls) mapControls.style.transform = '';
+        map.dragging.enable();
+        return;
+      }
+      mapEl.style.transformOrigin = '50% 50%';
+      map.dragging.disable();
+    }
+    setMapRotation(rotateToHeading);
 
     const kmh = (kn) => Math.round((kn || 0) * 1.852);
     const fmt = (n) => (n != null ? Number(n).toFixed(6) : '—');
@@ -357,6 +398,11 @@
         if (markerArrow) {
           markerArrow.style.transform = `rotate(${animState.headingDeg}deg)`;
         }
+
+        if (rotateToHeading) {
+          mapEl.style.transform = `rotate(${-animState.headingDeg}deg)`;
+          if (mapControls) mapControls.style.transform = `rotate(${animState.headingDeg}deg)`;
+        }
       }
     }
 
@@ -480,6 +526,7 @@
     /* UI Event Listeners */
     document.getElementById('toggle-follow').addEventListener('change', (e) => {
       followVehicle = e.target.checked;
+      saveControls();
     });
 
     document.getElementById('toggle-trail').addEventListener('change', (e) => {
@@ -488,6 +535,7 @@
         if (showTrail) trailPolyline.addTo(map);
         else trailPolyline.remove();
       }
+      saveControls();
     });
 
     document.getElementById('toggle-geofences').addEventListener('change', (e) => {
@@ -496,6 +544,13 @@
         if (showGeofences) l.addTo(map);
         else l.remove();
       });
+      saveControls();
+    });
+
+    document.getElementById('toggle-rotate').addEventListener('change', (e) => {
+      rotateToHeading = e.target.checked;
+      setMapRotation(rotateToHeading);
+      saveControls();
     });
 
     document.getElementById('btn-recenter').addEventListener('click', () => {

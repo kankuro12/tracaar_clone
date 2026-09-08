@@ -17,6 +17,9 @@ CREATE TABLE IF NOT EXISTS users (
   name          TEXT NOT NULL,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- Per-user map-control prefs (follow/trail/geofences) for the vehicle live page.
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS live_map_prefs JSONB;
 
 CREATE TABLE IF NOT EXISTS vehicles (
   id          BIGSERIAL PRIMARY KEY,
@@ -32,6 +35,12 @@ CREATE TABLE IF NOT EXISTS vehicles (
 );
 CREATE INDEX IF NOT EXISTS idx_vehicles_customer ON vehicles (customer_id);
 CREATE INDEX IF NOT EXISTS idx_vehicles_imei ON vehicles (imei); -- every ingest frame
+
+-- Soft-delete ("trash", restorable) and dashboard-visibility flag.
+ALTER TABLE vehicles
+  ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS hidden_from_dashboard BOOLEAN NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS idx_vehicles_deleted_at ON vehicles (deleted_at) WHERE deleted_at IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS vehicle_user (
   vehicle_id BIGINT NOT NULL REFERENCES vehicles(id) ON DELETE CASCADE,

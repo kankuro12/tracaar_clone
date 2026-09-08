@@ -26,7 +26,7 @@ function invalidateVehicleCache(imei) {
 async function vehicleLimitReached(customerId) {
   const r = await pool.query(
     `SELECT p.max_vehicles,
-            (SELECT count(*) FROM vehicles v WHERE v.customer_id = c.id) AS vehicle_count
+            (SELECT count(*) FROM vehicles v WHERE v.customer_id = c.id AND v.deleted_at IS NULL) AS vehicle_count
      FROM customers c LEFT JOIN plans p ON p.id = c.plan_id
      WHERE c.id = $1`,
     [customerId]
@@ -53,15 +53,17 @@ async function insertPosition({ vehicleId, valid, lat, lon, speedKn, course, dev
 // String so Set.has() matches what ingest passes (hub.publish keys by vehicle.id).
 async function visibleVehicleIds(user) {
   if (user.role === 'super_admin') {
-    const r = await pool.query('SELECT id FROM vehicles');
+    const r = await pool.query('SELECT id FROM vehicles WHERE deleted_at IS NULL');
     return new Set(r.rows.map((x) => String(x.id)));
   }
   if (user.role === 'admin') {
-    const r = await pool.query('SELECT id FROM vehicles WHERE customer_id = $1', [user.customerId]);
+    const r = await pool.query('SELECT id FROM vehicles WHERE customer_id = $1 AND deleted_at IS NULL', [user.customerId]);
     return new Set(r.rows.map((x) => String(x.id)));
   }
   const r = await pool.query(
-    `SELECT vehicle_id FROM vehicle_user WHERE user_id = $1`,
+    `SELECT vu.vehicle_id FROM vehicle_user vu
+     JOIN vehicles v ON v.id = vu.vehicle_id
+     WHERE vu.user_id = $1 AND v.deleted_at IS NULL`,
     [user.id]
   );
   return new Set(r.rows.map((x) => String(x.vehicle_id)));
@@ -72,7 +74,9 @@ async function canSeeVehicle(user, vehicleId) {
 }
 
 // One row per visible vehicle incl. latest position (null when never reported).
-async function latestPositions(user) {
+// Trashed vehicles are always excluded; pass { dashboard: true } to also
+// exclude vehicles flagged hidden_from_dashboard (dashboard/overview views).
+async function latestPositions(user, opts = {}) {
   const scope = user.role === 'super_admin'
     ? { sql: '', params: [] }
     : user.role === 'admin'
@@ -81,13 +85,16 @@ async function latestPositions(user) {
           sql: `WHERE v.id IN (SELECT vehicle_id FROM vehicle_user WHERE user_id = $1)`,
           params: [user.id],
         };
+  const conds = ['v.deleted_at IS NULL'];
+  if (opts.dashboard) conds.push('v.hidden_from_dashboard = false');
+  const whereSql = scope.sql ? `${scope.sql} AND ${conds.join(' AND ')}` : `WHERE ${conds.join(' AND ')}`;
   const r = await pool.query(
     `SELECT DISTINCT ON (v.id)
-       v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon,
+       v.id, v.name, v.plate, v.type, v.imei, v.dest_lat, v.dest_lon, v.hidden_from_dashboard,
        p.id AS position_id, p.recorded_at, p.device_time, p.valid, p.lat, p.lon, p.speed_kn, p.course, p.ignition, p.status_hex
      FROM vehicles v
      LEFT JOIN positions p ON p.vehicle_id = v.id
-     ${scope.sql}
+     ${whereSql}
      ORDER BY v.id, p.device_time DESC`, // device_time = fix time as the device saw it; recorded_at is arrival time
     scope.params
   );
@@ -195,6 +202,48 @@ async function reportSummary(user, from, to) {
   return r.rows;
 }
 
+async function getLiveMapPrefs(userId) {
+  const r = await pool.query('SELECT live_map_prefs FROM users WHERE id = $1', [userId]);
+  return (r.rows[0] && r.rows[0].live_map_prefs) || null;
+}
+
+async function setLiveMapPrefs(userId, prefs) {
+  await pool.query('UPDATE users SET live_map_prefs = $2 WHERE id = $1', [userId, JSON.stringify(prefs)]);
+}
+
+async function trashVehicle(customerId, vehicleId) {
+  const r = await pool.query(
+    `UPDATE vehicles SET deleted_at = now() WHERE id = $1 AND customer_id = $2 AND deleted_at IS NULL RETURNING id`,
+    [vehicleId, customerId]
+  );
+  return r.rows[0] || null;
+}
+
+async function restoreVehicle(customerId, vehicleId) {
+  const r = await pool.query(
+    `UPDATE vehicles SET deleted_at = NULL WHERE id = $1 AND customer_id = $2 AND deleted_at IS NOT NULL RETURNING id`,
+    [vehicleId, customerId]
+  );
+  return r.rows[0] || null;
+}
+
+async function setVehicleDashboardHidden(customerId, vehicleId, hidden) {
+  const r = await pool.query(
+    `UPDATE vehicles SET hidden_from_dashboard = $3 WHERE id = $1 AND customer_id = $2 RETURNING id`,
+    [vehicleId, customerId, !!hidden]
+  );
+  return r.rows[0] || null;
+}
+
+async function listTrashedVehicles(customerId) {
+  const r = await pool.query(
+    `SELECT id, name, plate, type, imei, deleted_at FROM vehicles
+     WHERE customer_id = $1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC`,
+    [customerId]
+  );
+  return r.rows;
+}
+
 async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
   const rows = await positionHistory(user, vehicleId, from, to);
   if (rows === null) return null;
@@ -203,4 +252,4 @@ async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
   return pts.filter((_, i) => i % step === 0);
 }
 
-module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback, vehicleLimitReached };
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback, vehicleLimitReached, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, getLiveMapPrefs, setLiveMapPrefs };

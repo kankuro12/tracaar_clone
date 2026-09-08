@@ -1,0 +1,66 @@
+<%- include('partials/head', { title: 'Vehicle Trash' }) %>
+  <%- include('partials/topbar') %>
+  <div class="d-flex">
+    <%- include('partials/nav', { active }) %>
+    <main class="admin-main flex-grow-1 p-4 bg-body-tertiary" style="min-height: calc(100vh - 56px)">
+      <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+          <h1 class="h4 mb-0 fw-bold">Vehicle Trash</h1>
+          <p class="text-body-secondary small mb-0">Trashed vehicles are hidden from the active list and dashboards but keep their data — restore any time.</p>
+        </div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-sm btn-outline-secondary d-inline-flex align-items-center gap-1" href="/admin/vehicles">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            Back to Vehicles
+          </a>
+          <span class="badge text-bg-secondary px-3 py-2 font-monospace"><%= vehicles.length %> Trashed</span>
+        </div>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Type</th>
+                <th>Plate</th>
+                <th>IMEI</th>
+                <th>Trashed</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              <% if (!vehicles.length) { %>
+              <tr><td colspan="6" class="text-body-secondary py-4 text-center">Trash is empty.</td></tr>
+              <% } %>
+              <% vehicles.forEach((v) => { %>
+              <tr>
+                <td class="fw-semibold"><%= v.name %></td>
+                <td><%= v.type %></td>
+                <td><span class="badge text-bg-dark border border-secondary-subtle font-monospace"><%= v.plate || '—' %></span></td>
+                <td class="font-monospace small text-body-secondary"><%= v.imei %></td>
+                <td class="small text-body-secondary"><%= fmtDT(v.deleted_at) %></td>
+                <td class="text-end">
+                  <button class="btn btn-sm btn-primary bg-gradient d-inline-flex align-items-center gap-1 vehicle-restore" data-vid="<%= v.id %>">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+                    Restore
+                  </button>
+                </td>
+              </tr>
+              <% }) %>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+  <%- include('partials/scripts') %>
+  <script>
+    $('.vehicle-restore').on('click', async function () {
+      try { await api(`/api/vehicles/${this.dataset.vid}/restore`, { method: 'POST' }); location.reload(); }
+      catch (err) { showErr(this.closest('tr'), err.message); }
+    });
+  </script>
+</body>
+</html>
