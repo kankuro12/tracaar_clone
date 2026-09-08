@@ -814,3 +814,7 @@ a { color: var(--primary); }
 .map-error strong { color: var(--danger, #ef4444); font-size: 15px; }
 .map-error span { color: var(--muted); max-width: 40rem; word-break: break-word; }
 .map-error small { color: var(--faint); }
+
+/* .map-error doubles as the trips empty state, so [hidden] must beat display:flex */
+.map-error[hidden] { display: none; }
+.map-empty strong { color: var(--text); }

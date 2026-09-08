@@ -3,45 +3,198 @@
 <div class="d-flex">
 <%- include('partials/nav', { active }) %>
 <main class="admin-main flex-grow-1 p-3 p-md-4">
-  <h1 class="h4 fw-bold mb-3">Trips & playback</h1>
+  <h1 class="h4 fw-bold mb-3">Trips &amp; playback</h1>
+
   <div class="card p-3 mb-3"><div class="row g-2 align-items-end">
-    <div class="col-md-4"><label class="form-label small">Vehicle</label><select id="trip-vehicle" class="form-select"><% vehicles.forEach((v) => { %><option value="<%= v.id %>"><%= v.name %></option><% }) %></select></div>
-    <div class="col-md-3"><label class="form-label small">From</label><input id="trip-from" type="datetime-local" class="form-control"></div>
-    <div class="col-md-3"><label class="form-label small">To</label><input id="trip-to" type="datetime-local" class="form-control"></div>
-    <div class="col-md-2"><button id="trip-load" class="btn btn-primary w-100">Load</button></div>
+    <div class="col-md-3">
+      <label class="form-label small" for="trip-vehicle">Vehicle</label>
+      <select id="trip-vehicle" class="form-select">
+        <%
+          // Default to a vehicle that actually has fixes - picking one with no
+          // data renders an empty map and looks like the page is broken.
+          const firstWithData = vehicles.find((v) => v.recorded_at);
+        %>
+        <% vehicles.forEach((v) => { %>
+          <option value="<%= v.id %>" <%= firstWithData && v.id === firstWithData.id ? 'selected' : '' %> data-hasdata="<%= v.recorded_at ? 1 : 0 %>">
+            <%= v.name %><%= v.plate ? ' · ' + v.plate : '' %><%= v.recorded_at ? '' : ' · no data' %>
+          </option>
+        <% }) %>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small" for="trip-from">From</label>
+      <input id="trip-from" type="datetime-local" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label small" for="trip-to">To</label>
+      <input id="trip-to" type="datetime-local" class="form-control">
+    </div>
+    <div class="col-md-2">
+      <label class="form-label small" for="trip-trail">Trail</label>
+      <select id="trip-trail" class="form-select">
+        <option value="full" selected>Full trail</option>
+        <option value="past">Past trail</option>
+      </select>
+    </div>
+    <div class="col-md-1"><button id="trip-load" class="btn btn-primary w-100">Load</button></div>
+    <div class="col-12 d-flex gap-2 pt-1">
+      <button class="btn btn-sm btn-outline-secondary trip-range-preset" data-range="today">Today</button>
+      <button class="btn btn-sm btn-outline-secondary trip-range-preset" data-range="yesterday">Yesterday</button>
+      <button class="btn btn-sm btn-outline-secondary trip-range-preset" data-range="7d">Last 7 days</button>
+    </div>
   </div></div>
-  <div class="card overflow-hidden"><div id="trip-map" style="height:55vh"></div>
-    <div class="card-footer d-flex gap-2 align-items-center"><button id="trip-play" class="btn btn-sm btn-outline-primary">▶ Play</button><input id="trip-range" type="range" class="form-range" min="0" max="100" value="0"><span id="trip-info" class="font-monospace small text-body-secondary"></span>
-    <a id="trip-csv" class="btn btn-sm btn-outline-secondary ms-auto" href="#">CSV</a></div></div>
+
+  <div class="card overflow-hidden">
+    <div class="position-relative">
+      <div id="trip-map" style="height:55vh"></div>
+      <div id="trip-empty" class="map-error map-empty" hidden>
+        <strong>No fixes in this range</strong>
+        <span></span>
+        <small>Pick another vehicle or widen the time range.</small>
+      </div>
+    </div>
+    <div class="card-footer d-flex gap-2 align-items-center flex-wrap">
+      <button id="trip-play" class="btn btn-sm btn-outline-primary" disabled>▶ Play</button>
+      <input id="trip-range" type="range" class="form-range flex-grow-1" style="min-width:140px" min="0" max="0" value="0" disabled>
+      <span id="trip-clock" class="font-monospace small">—</span>
+      <span id="trip-info" class="font-monospace small text-body-secondary"></span>
+      <a id="trip-csv" class="btn btn-sm btn-outline-secondary ms-auto" href="#">CSV</a>
+    </div>
+  </div>
 </main></div>
 <%- include('partials/scripts') %>
 <%- include('partials/map-lib') %>
 <script>
 const map = L.map('trip-map').setView([27.7, 85.3], 12);
 baseLayer(map);
-let pts = [], line = null, marker = null, timer = null, idx = 0;
+
+let pts = [], latlngs = [], line = null, marker = null, startDot = null, endDot = null, timer = null, idx = 0;
+
+const pad = (n) => String(n).padStart(2, '0');
+const localInput = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const fmtClock = (ts) => (ts ? new Date(ts).toLocaleString() : '—');
+
+// Default range: midnight today -> now, in the viewer's own timezone.
+function setRange(which) {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let from = start, to = now;
+  if (which === 'yesterday') {
+    from = new Date(start.getTime() - 864e5);
+    to = new Date(start.getTime() - 60000);
+  } else if (which === '7d') {
+    from = new Date(start.getTime() - 6 * 864e5);
+  }
+  $('#trip-from').val(localInput(from));
+  $('#trip-to').val(localInput(to));
+}
+
+function tripMarker(colour) {
+  return L.divIcon({ className: '', html: `<div class="marker-dot selected" style="background:${colour}"></div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
+}
+
+function haversineKm(a, b) {
+  const R = 6371, rad = (x) => (x * Math.PI) / 180;
+  const dLat = rad(b[0] - a[0]), dLon = rad(b[1] - a[1]);
+  const s = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a[0])) * Math.cos(rad(b[0])) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(s));
+}
+
+function clearMap() {
+  [line, marker, startDot, endDot].forEach((l) => l && l.remove());
+  line = marker = startDot = endDot = null;
+}
+
+// "full" draws the whole route up front; "past" reveals it behind the playhead.
+function drawTrail() {
+  if (!latlngs.length) return;
+  const shown = $('#trip-trail').val() === 'past' ? latlngs.slice(0, idx + 1) : latlngs;
+  if (line) line.setLatLngs(shown);
+  else line = L.polyline(shown, { className: 'trail', color: '#3b82f6', weight: 4, opacity: 0.9 }).addTo(map);
+}
+
+function seek(i) {
+  if (!pts.length) return;
+  idx = Math.max(0, Math.min(i, pts.length - 1));
+  const p = pts[idx];
+  marker.setLatLng([p.lat, p.lon]);
+  $('#trip-range').val(idx);
+  $('#trip-clock').text(fmtClock(p.device_time || p.recorded_at) + ' · ' + Math.round((p.speed_kn || 0) * 1.852) + ' km/h');
+  drawTrail();
+}
+
+function stop() {
+  if (timer) clearInterval(timer);
+  timer = null;
+  $('#trip-play').text('▶ Play');
+}
+
 async function load() {
   const vid = $('#trip-vehicle').val();
-  const from = new Date($('#trip-from').val() || Date.now() - 864e5).toISOString();
-  const to = new Date($('#trip-to').val() || Date.now()).toISOString();
-  const r = await api(`/api/vehicles/${vid}/playback?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
-  pts = r; idx = 0;
-  if (line) line.remove(); if (marker) marker.remove();
-  const ll = pts.map((p) => [p.lat, p.lon]);
-  if (ll.length) { line = L.polyline(ll).addTo(map); map.fitBounds(ll); marker = L.marker(ll[0]).addTo(map); }
-  $('#trip-info').text(`${pts.length} fixes`);
-  $('#trip-range').attr('max', Math.max(0, pts.length - 1));
-  $('#trip-csv').attr('href', `/api/vehicles/${vid}/playback?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}&format=csv`);
+  if (!vid) return;
+  stop();
+  const from = new Date($('#trip-from').val()).toISOString();
+  const to = new Date($('#trip-to').val()).toISOString();
+  const qs = `from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`;
+  $('#trip-csv').attr('href', `/api/vehicles/${vid}/playback?${qs}&format=csv`);
+  $('#trip-info').text('loading…');
+
+  try {
+    pts = await api(`/api/vehicles/${vid}/playback?${qs}`);
+  } catch (err) {
+    pts = [];
+    $('#trip-info').text('');
+    $('#trip-empty span').text(err.message);
+    $('#trip-empty').prop('hidden', false);
+    return;
+  }
+
+  idx = 0;
+  clearMap();
+  latlngs = pts.map((p) => [p.lat, p.lon]);
+  $('#trip-range').attr('max', Math.max(0, pts.length - 1)).val(0).prop('disabled', pts.length < 2);
+  $('#trip-play').prop('disabled', pts.length < 2);
+
+  if (!pts.length) {
+    $('#trip-empty span').text('This vehicle reported nothing between those times.');
+    $('#trip-empty').prop('hidden', false);
+    $('#trip-info').text('0 fixes');
+    $('#trip-clock').text('—');
+    return;
+  }
+  $('#trip-empty').prop('hidden', true);
+
+  let km = 0;
+  for (let i = 1; i < latlngs.length; i++) km += haversineKm(latlngs[i - 1], latlngs[i]);
+  const mins = Math.round((new Date(pts[pts.length - 1].device_time || pts[pts.length - 1].recorded_at) - new Date(pts[0].device_time || pts[0].recorded_at)) / 60000);
+  $('#trip-info').text(`${pts.length} fixes · ${km.toFixed(1)} km · ${Math.floor(mins / 60)}h ${mins % 60}m`);
+
+  startDot = L.circleMarker(latlngs[0], { radius: 6, color: '#10b981', fillColor: '#10b981', fillOpacity: 0.9, weight: 2 }).addTo(map).bindPopup('Trip start');
+  endDot = L.circleMarker(latlngs[latlngs.length - 1], { radius: 6, color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.9, weight: 2 }).addTo(map).bindPopup('Trip end');
+  marker = L.marker(latlngs[0], { icon: tripMarker('#3b82f6') }).addTo(map);
+  drawTrail();
+  map.fitBounds(latlngs, { padding: [40, 40], maxZoom: 17 });
+  seek(0);
 }
+
 $('#trip-load').on('click', load);
-$('#trip-range').on('input', function () { idx = +this.value; if (pts[idx]) marker.setLatLng([pts[idx].lat, pts[idx].lon]); });
+$('#trip-vehicle').on('change', load);
+$('#trip-trail').on('change', drawTrail);
+$('.trip-range-preset').on('click', function () { setRange($(this).data('range')); load(); });
+$('#trip-range').on('input', function () { stop(); seek(+this.value); });
 $('#trip-play').on('click', () => {
-  if (timer) { clearInterval(timer); timer = null; $('#trip-play').text('▶ Play'); return; }
+  if (timer) return stop();
+  if (idx >= pts.length - 1) seek(0);
   $('#trip-play').text('⏸ Pause');
-  timer = setInterval(() => { if (!pts.length) return; idx = (idx + 1) % pts.length; marker.setLatLng([pts[idx].lat, pts[idx].lon]); $('#trip-range').val(idx); }, 300);
+  timer = setInterval(() => {
+    if (idx >= pts.length - 1) return stop();
+    seek(idx + 1);
+  }, 300);
 });
-const qs = new URLSearchParams(location.search);
-if (qs.get('vehicleId')) $('#trip-vehicle').val(qs.get('vehicleId'));
+
+const params = new URLSearchParams(location.search);
+if (params.get('vehicleId')) $('#trip-vehicle').val(params.get('vehicleId'));
+setRange('today');
 load();
 </script>
 </body></html>
