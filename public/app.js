@@ -18,10 +18,80 @@ const state = {
   trail: null,
   trailPts: [],   // raw fixes; the drawn line is the smoothed version of these
   geofences: [],
+  geofenceLayers: [], // parallel Leaflet layers, toggled by the "show geofences" control
   banners: [],
 };
 
 let ws = null; // realtime socket (set by connectWs)
+
+/* ---------- single-vehicle map controls (follow/trail/geofences/rotate) ----------
+   Same controls as the single-vehicle live page, shown only while exactly one
+   vehicle is selected here; prefs are shared (server-side, per user) with that page. */
+const mapEl = document.getElementById('map');
+const mapControlsPanel = document.getElementById('single-vehicle-controls');
+const mapZoomControls = mapEl.querySelector('.leaflet-control-container');
+const savedControls = (window.FLEET && window.FLEET.liveMapPrefs) || {};
+let followVehicle = savedControls.follow !== undefined ? savedControls.follow : true;
+let showTrail = savedControls.trail !== undefined ? savedControls.trail : true;
+let showGeofences = savedControls.geofences !== undefined ? savedControls.geofences : true;
+let rotateToHeading = savedControls.rotate !== undefined ? savedControls.rotate : false;
+
+function saveControls() {
+  fetch('/api/users/me/live-map-prefs', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ follow: followVehicle, trail: showTrail, geofences: showGeofences, rotate: rotateToHeading }),
+  });
+}
+
+function applyGeofenceVisibility() {
+  for (const layer of state.geofenceLayers) {
+    if (showGeofences) layer.addTo(map);
+    else layer.remove();
+  }
+}
+
+// Heading-up mode: rotates the map container opposite the selected vehicle's
+// heading (cancels out with the marker's own heading rotation, so it points
+// straight up). Dragging is disabled while active — see vehicle-live.ejs.
+function setMapRotation(active) {
+  if (!active) {
+    mapEl.style.transform = '';
+    if (mapZoomControls) mapZoomControls.style.transform = '';
+    map.dragging.enable();
+    return;
+  }
+  mapEl.style.transformOrigin = '50% 50%';
+  map.dragging.disable();
+}
+
+document.getElementById('toggle-follow').checked = followVehicle;
+document.getElementById('toggle-trail').checked = showTrail;
+document.getElementById('toggle-geofences').checked = showGeofences;
+document.getElementById('toggle-rotate').checked = rotateToHeading;
+
+document.getElementById('toggle-follow').addEventListener('change', (e) => {
+  followVehicle = e.target.checked;
+  saveControls();
+});
+document.getElementById('toggle-trail').addEventListener('change', (e) => {
+  showTrail = e.target.checked;
+  const [id] = state.selected;
+  if (showTrail && id) drawTrail(id);
+  else if (state.trail) { state.trail.remove(); state.trail = null; state.trailPts = []; }
+  saveControls();
+});
+document.getElementById('toggle-geofences').addEventListener('change', (e) => {
+  showGeofences = e.target.checked;
+  applyGeofenceVisibility();
+  saveControls();
+});
+document.getElementById('toggle-rotate').addEventListener('change', (e) => {
+  rotateToHeading = e.target.checked;
+  setMapRotation(rotateToHeading);
+  saveControls();
+});
+setMapRotation(rotateToHeading && state.selected.size === 1);
 
 /* ---------- helpers ---------- */
 const kmh = (kn) => Math.round((kn || 0) * 1.852);
@@ -106,15 +176,19 @@ function applySelection() {
       if (!state.selected.has(v)) ws.send(JSON.stringify({ type: 'unsubscribe', vehicleId: v }));
     }
   }
-  // single-select -> trail; multi-select / none -> no trail
+  // single-select -> trail + map controls; multi-select / none -> no trail
   if (state.selected.size === 1) {
     const [id] = state.selected;
-    drawTrail(id);
+    if (showTrail) drawTrail(id); else if (state.trail) { state.trail.remove(); state.trail = null; state.trailPts = []; }
     focus(id);
+    mapControlsPanel.classList.remove('d-none');
+    setMapRotation(rotateToHeading);
   } else {
     if (state.trail) { state.trail.remove(); state.trail = null; state.trailPts = []; }
     if (state.selected.size > 1) fitTo(state.selected);
     else fitTo(new Set(state.vehicles.keys()));
+    mapControlsPanel.classList.add('d-none');
+    setMapRotation(false);
   }
   for (const v of state.vehicles.values()) {
     setMarkerIcon(v.id);
@@ -219,13 +293,11 @@ async function loadGeofences() {
   const r = await fetch('/api/geofences', { headers: { Authorization: `Bearer ${token}` } });
   if (!r.ok) return;
   state.geofences = await r.json();
-  for (const g of state.geofences) {
-    L.circle([g.lat, g.lon], {
-      radius: g.radius_m,
-      className: 'geofence',
-      interactive: false,
-    }).addTo(map).bindTooltip(g.name, { permanent: false });
-  }
+  state.geofenceLayers = state.geofences.map((g) =>
+    L.circle([g.lat, g.lon], { radius: g.radius_m, className: 'geofence', interactive: false })
+      .bindTooltip(g.name, { permanent: false })
+  );
+  applyGeofenceVisibility();
 }
 
 /* ---------- alert banners ---------- */
@@ -333,13 +405,18 @@ function tickMotion() {
       a.pos = deadReckon(a.last, now - a.last.time, MOTION.drMs);
     }
     m.setLatLng(a.pos);
-    if (state.selected.size === 1 && state.selected.has(id)) map.panTo(a.pos, { animate: false });
+    const isSoleSelected = state.selected.size === 1 && state.selected.has(id);
+    if (followVehicle && isSoleSelected) map.panTo(a.pos, { animate: false });
     if (a.heading) {
       const t = Math.min(1, (now - a.heading.start) / a.heading.dur);
       a.headingDeg = (a.heading.from + shortestAngle(a.heading.from, a.heading.to) * easeOut(t) + 360) % 360;
       if (t >= 1) a.heading = null;
     }
     setRotation(id, a.headingDeg);
+    if (rotateToHeading && isSoleSelected) {
+      mapEl.style.transform = `rotate(${-a.headingDeg}deg)`;
+      if (mapZoomControls) mapZoomControls.style.transform = `rotate(${a.headingDeg}deg)`;
+    }
   }
 }
 

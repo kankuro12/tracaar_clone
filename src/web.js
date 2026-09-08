@@ -132,8 +132,9 @@ router.get('/', async (req, res) => {
 });
 
 // ---- live map (app) ----
-router.get('/app', loadUser, (req, res) => {
-  res.render('map', { token: req.session.token, active: 'app' });
+router.get('/app', loadUser, async (req, res) => {
+  const liveMapPrefs = await getLiveMapPrefs(req.user.id);
+  res.render('map', { token: req.session.token, active: 'app', liveMapPrefs });
 });
 
 // ---- customer portal ----
