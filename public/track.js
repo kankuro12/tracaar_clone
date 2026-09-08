@@ -146,12 +146,15 @@ const VEHICLE_GLYPHS = {
   truck: '<rect x="6.6" y="11.5" width="12.8" height="8.4" rx="2.4" fill="#fff"/>'
        + '<rect x="8.6" y="13.6" width="8.8" height="3.2" rx="1" fill="currentColor"/>'
        + '<rect x="5.8" y="21.4" width="14.4" height="14.4" rx="1.8" fill="#fff"/>',
-  bike: '<rect x="10.6" y="12.4" width="4.8" height="21" rx="2.4" fill="#fff"/>'
-      + '<rect x="7.4" y="19.4" width="11.2" height="3" rx="1.5" fill="#fff"/>'
-      + '<circle cx="13" cy="16" r="1.5" fill="currentColor"/>',
+  // narrow body, handlebars near the nose, wider seat behind - reads as a bike
+  // from above rather than the plus-sign a centred crossbar produces
+  bike: '<rect x="11.1" y="12.6" width="3.8" height="21" rx="1.9" fill="#fff"/>'
+      + '<rect x="8.2" y="16.2" width="9.6" height="2.6" rx="1.3" fill="#fff"/>'
+      + '<rect x="9.8" y="24.6" width="6.4" height="5.2" rx="2" fill="#fff"/>',
   // narrow at the front, wide at the back - the auto-rickshaw silhouette
-  three_wheeler: '<path d="M13 12.2c3.4 0 5.2 2 5.8 5l1 12a2 2 0 0 1-2 2.3H8.2a2 2 0 0 1-2-2.3l1-12c.6-3 2.4-5 5.8-5z" fill="#fff"/>'
-               + '<path d="M9.9 18.4h6.2l-.5-2.2a1 1 0 0 0-1-.8h-3.2a1 1 0 0 0-1 .8z" fill="currentColor"/>',
+  three_wheeler: '<path d="M13 12.1c2.2 0 3.4 1.5 3.8 3.6l1.9 13.1a2.1 2.1 0 0 1-2.1 2.5H9.4a2.1 2.1 0 0 1-2.1-2.5l1.9-13.1c.4-2.1 1.6-3.6 3.8-3.6z" fill="#fff"/>'
+               + '<path d="M10.7 19.2h4.6l-.5-2.4a1 1 0 0 0-1-.8h-1.6a1 1 0 0 0-1 .8z" fill="currentColor"/>'
+               + '<rect x="8.9" y="25.4" width="8.2" height="3.4" rx="1.2" fill="currentColor"/>',
 };
 
 // One marker = body + silhouette, as a single SVG so both rotate together.
