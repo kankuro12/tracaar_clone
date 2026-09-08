@@ -1,19 +1,29 @@
 <script>
   window.MAP_CONFIG = <%- JSON.stringify(mapConfig) %>;
-  // Base tile layer for every map page - provider chosen by MAP_TYPE (see src/maps.js).
-  // On a provider error we show the error over the map container rather than
-  // quietly swapping in a different map.
+  window.__mapContainers = window.__mapContainers || [];
+
+  // Provider failures are shown, never papered over with a different map.
+  window.showMapError = (msg) => {
+    console.error('map provider error:', msg);
+    (window.__mapContainers.length ? window.__mapContainers : [document.getElementById('map'), document.getElementById('trip-map'), document.getElementById('route-map')])
+      .filter(Boolean)
+      .forEach((el) => {
+        if (el.querySelector('.map-error')) return;
+        const box = document.createElement('div');
+        box.className = 'map-error';
+        box.innerHTML = '<strong>Map unavailable</strong><span></span><small>Provider: ' + MAP_CONFIG.provider + '</small>';
+        box.querySelector('span').textContent = msg;
+        el.appendChild(box);
+      });
+  };
+
+  // Google reports a bad key only at map-render time, through this hook.
+  window.gm_authFailure = () => window.showMapError('Google Maps rejected the API key - check that the Maps JavaScript API is enabled and that this domain is an allowed referrer.');
+
+  // Base layer: Leaflet needs an explicit tile layer, Google serves its own.
   window.baseLayer = (map) => {
-    if (MAP_CONFIG.error) {
-      const el = map.getContainer();
-      const box = document.createElement('div');
-      box.className = 'map-error';
-      box.innerHTML = '<strong>Map unavailable</strong><span></span><small>Provider: ' + MAP_CONFIG.provider + '</small>';
-      box.querySelector('span').textContent = MAP_CONFIG.error;
-      el.appendChild(box);
-      console.error('map provider error:', MAP_CONFIG.error);
-      return null;
-    }
+    if (MAP_CONFIG.error) { window.showMapError(MAP_CONFIG.error); return null; }
+    if (MAP_CONFIG.provider === 'google') return null;
     return L.tileLayer(MAP_CONFIG.url, { maxZoom: MAP_CONFIG.maxZoom, attribution: MAP_CONFIG.attribution }).addTo(map);
   };
 </script>

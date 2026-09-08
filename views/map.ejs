@@ -28,7 +28,7 @@
   </div>
   <script>window.FLEET = { user: <%- JSON.stringify(user) %>, token: <%- JSON.stringify(token) %> };</script>
   <%- include('partials/scripts') %>
-  <script src="/vendor/leaflet/leaflet.js"></script>
+  <%- include('partials/map-lib') %>
   <script src="/app.js"></script>
 </body>
 </html>

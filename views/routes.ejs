@@ -24,7 +24,7 @@
     </main>
   </div>
   <%- include('partials/scripts') %>
-  <script src="/vendor/leaflet/leaflet.js"></script>
+  <%- include('partials/map-lib') %>
   <script>
     $('#optimize').on('click', async () => {
       const result = $('#route-result');

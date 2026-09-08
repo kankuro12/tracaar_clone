@@ -1,0 +1,8 @@
+<% if (mapConfig.error) { %>
+  <script src="/map-error.js"></script>
+<% } else if (mapConfig.provider === 'google') { %>
+  <script src="https://maps.googleapis.com/maps/api/js?key=<%= encodeURIComponent(mapConfig.key) %>&v=weekly&language=<%= encodeURIComponent(mapConfig.language) %>&region=<%= encodeURIComponent(mapConfig.region) %>"></script>
+  <script src="/gmap.js"></script>
+<% } else { %>
+  <script src="/vendor/leaflet/leaflet.js"></script>
+<% } %>

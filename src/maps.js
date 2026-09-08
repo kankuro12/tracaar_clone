@@ -1,13 +1,12 @@
-// Base-map provider. MAP_TYPE picks the tile source; every page keeps using
-// Leaflet, so only the L.tileLayer URL/attribution changes between providers.
+// Base-map provider. MAP_TYPE picks which mapping library the pages load:
 //
-//   MAP_TYPE=leaflet   OpenStreetMap tiles (default, no credentials)
-//   MAP_TYPE=google    Google Map Tiles API (needs GOOGLE_MAPS_API_KEY)
+//   MAP_TYPE=leaflet   Leaflet + OpenStreetMap tiles (default, no credentials)
+//   MAP_TYPE=google    Google Maps JavaScript API (needs GOOGLE_MAPS_API_KEY)
 //
 // A misconfigured provider is never silently swapped for another one: mapConfig
-// returns { error } and the page shows that error in place of the map.
-
-const RETRY_MS = 30_000; // don't hammer createSession while the key is broken
+// returns { error } and the page shows that error in place of the map. The key
+// is validated in the browser instead of here - Google only reports auth
+// failures at map-render time, via the gm_authFailure hook.
 
 const OSM = {
   provider: 'osm',
@@ -16,40 +15,11 @@ const OSM = {
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
 };
 
-let session = null;   // { token, expiresAt } — Google sessions last ~2 weeks
-let lastError = null; // { message, until } — cached so every request doesn't retry
-
 function fail(provider, message) {
   console.error(`maps: ${message}`);
   return { provider, error: message };
 }
 
-async function googleSession(key) {
-  if (session && session.expiresAt > Date.now() + 60_000) return session.token;
-  // A referrer-restricted key rejects this server-side call, which carries no
-  // Referer of its own — GOOGLE_MAPS_REFERRER supplies one of the allowed origins.
-  const referrer = process.env.GOOGLE_MAPS_REFERRER;
-  const res = await fetch(`https://tile.googleapis.com/v1/createSession?key=${encodeURIComponent(key)}`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', ...(referrer && { referer: referrer }) },
-    body: JSON.stringify({
-      mapType: process.env.GOOGLE_MAPS_MAP_TYPE || 'roadmap',
-      language: process.env.GOOGLE_MAPS_LANGUAGE || 'en-US',
-      region: process.env.GOOGLE_MAPS_REGION || 'NP',
-    }),
-  });
-  if (!res.ok) {
-    const detail = (await res.text()).slice(0, 200);
-    const hint = /referer/i.test(detail) && !referrer ? ' — set GOOGLE_MAPS_REFERRER to an allowed origin' : '';
-    throw new Error(`Google createSession failed (HTTP ${res.status}): ${detail}${hint}`);
-  }
-  const body = await res.json();
-  if (!body.session) throw new Error('Google createSession returned no session token');
-  session = { token: body.session, expiresAt: +body.expiry * 1000 };
-  return session.token;
-}
-
-// Resolved per request (cheap: the session token is cached until it expires).
 async function mapConfig() {
   const type = (process.env.MAP_TYPE || 'leaflet').toLowerCase();
   if (type === 'leaflet') return OSM;
@@ -57,22 +27,15 @@ async function mapConfig() {
 
   const key = process.env.GOOGLE_MAPS_API_KEY;
   if (!key) return fail('google', 'MAP_TYPE=google but GOOGLE_MAPS_API_KEY is unset');
-  if (lastError && lastError.until > Date.now()) return { provider: 'google', error: lastError.message };
 
-  try {
-    const token = await googleSession(key);
-    lastError = null;
-    return {
-      provider: 'google',
-      url: `https://tile.googleapis.com/v1/2dtiles/{z}/{x}/{y}?session=${token}&key=${encodeURIComponent(key)}`,
-      maxZoom: 22,
-      attribution: '&copy; <a href="https://www.google.com/intl/en_us/help/terms_maps/">Google</a>',
-    };
-  } catch (err) {
-    session = null;
-    lastError = { message: err.message, until: Date.now() + RETRY_MS };
-    return fail('google', err.message);
-  }
+  return {
+    provider: 'google',
+    key,
+    mapType: process.env.GOOGLE_MAPS_MAP_TYPE || 'roadmap',
+    language: process.env.GOOGLE_MAPS_LANGUAGE || 'en-US',
+    region: process.env.GOOGLE_MAPS_REGION || 'NP',
+    maxZoom: 22,
+  };
 }
 
 module.exports = { mapConfig };
