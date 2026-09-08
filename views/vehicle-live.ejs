@@ -223,6 +223,17 @@
     }
     setMapRotation(rotateToHeading);
 
+    // Manual pan/zoom pauses follow so the user can move and zoom freely while
+    // heading-up rotation stays on; the Recenter button re-enables follow.
+    function pauseFollow() {
+      if (!followVehicle) return;
+      followVehicle = false;
+      const t = document.getElementById('toggle-follow');
+      if (t) t.checked = false;
+      saveControls();
+    }
+    map.on('dragstart', pauseFollow);
+
     const kmh = (kn) => Math.round((kn || 0) * 1.852);
     const fmt = (n) => (n != null ? Number(n).toFixed(6) : '—');
 
@@ -561,6 +572,10 @@
     document.getElementById('btn-recenter').addEventListener('click', () => {
       if (vehicle.position) {
         map.setView([vehicle.position.lat, vehicle.position.lon], 16, { animate: true });
+        followVehicle = true;
+        const t = document.getElementById('toggle-follow');
+        if (t) t.checked = true;
+        saveControls();
       }
     });
 

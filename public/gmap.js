@@ -259,7 +259,14 @@
     self.setBearing = (deg) => {
       if (self._gmap.setHeading) self._gmap.setHeading(((deg % 360) + 360) % 360);
     };
-    self.on = () => self;
+    self.on = (ev, fn) => {
+      // Leaflet→Google event map for the interactions the pages care about.
+      // dragstart fires only on user drags (programmatic setCenter does not),
+      // so it's safe to use as a "user took over the map" signal.
+      const g = { dragstart: 'dragstart' }[ev];
+      if (g) self._gmap.addListener(g, fn);
+      return self;
+    };
     window.__mapContainers.push(self._el);
     return self;
   }

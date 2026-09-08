@@ -73,6 +73,17 @@ document.getElementById('toggle-trail').checked = showTrail;
 document.getElementById('toggle-geofences').checked = showGeofences;
 document.getElementById('toggle-rotate').checked = rotateToHeading;
 
+// Manual pan/zoom pauses follow so the user can move and zoom freely while
+// heading-up rotation stays on; toggling Follow back on re-centers.
+function pauseFollow() {
+  if (!followVehicle) return;
+  followVehicle = false;
+  const t = document.getElementById('toggle-follow');
+  if (t) t.checked = false;
+  saveControls();
+}
+map.on('dragstart', pauseFollow);
+
 document.getElementById('toggle-follow').addEventListener('change', (e) => {
   followVehicle = e.target.checked;
   saveControls();
