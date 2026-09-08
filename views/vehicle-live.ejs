@@ -203,22 +203,23 @@
     document.getElementById('toggle-geofences').checked = showGeofences;
     document.getElementById('toggle-rotate').checked = rotateToHeading;
 
-    // Heading-up mode: rotate the map container opposite the vehicle's heading so
-    // it always points "up" on screen (composes with the marker's own heading
-    // rotation in tickMotion, which cancels out to point straight up). Dragging
-    // is disabled while active since Leaflet's drag math doesn't know about the
-    // CSS rotation and would otherwise feel wrong.
+    // Heading-up mode. On Google (vector map) this rotates the map itself via
+    // setBearing so North tracks the vehicle's heading; Leaflet has no native
+    // rotation, so it falls back to CSS-rotating the container (dragging is
+    // disabled there since Leaflet's drag math doesn't know about the transform).
     const mapEl = document.getElementById('map');
     const mapControls = mapEl.querySelector('.leaflet-control-container');
     function setMapRotation(active) {
-      if (!active) {
-        mapEl.style.transform = '';
-        if (mapControls) mapControls.style.transform = '';
-        map.dragging.enable();
+      if (active) {
+        if (map.setBearing) { map.setBearing(0); return; }
+        mapEl.style.transformOrigin = '50% 50%';
+        map.dragging.disable();
         return;
       }
-      mapEl.style.transformOrigin = '50% 50%';
-      map.dragging.disable();
+      if (map.setBearing) { map.setBearing(0); return; }
+      mapEl.style.transform = '';
+      if (mapControls) mapControls.style.transform = '';
+      map.dragging.enable();
     }
     setMapRotation(rotateToHeading);
 
@@ -400,8 +401,12 @@
         }
 
         if (rotateToHeading) {
-          mapEl.style.transform = `rotate(${-animState.headingDeg}deg)`;
-          if (mapControls) mapControls.style.transform = `rotate(${animState.headingDeg}deg)`;
+          if (map.setBearing) {
+            map.setBearing(animState.headingDeg);
+          } else {
+            mapEl.style.transform = `rotate(${-animState.headingDeg}deg)`;
+            if (mapControls) mapControls.style.transform = `rotate(${animState.headingDeg}deg)`;
+          }
         }
       }
     }

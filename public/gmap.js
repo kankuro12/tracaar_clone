@@ -200,7 +200,7 @@
   function LMap(el) {
     const self = {};
     self._el = typeof el === 'string' ? document.getElementById(el) : el;
-    self._gmap = new (gm().Map)(self._el, {
+    const mapOpts = {
       center: { lat: 0, lng: 0 },
       zoom: 2,
       mapTypeId: MAP_TYPE_ID[cfg.mapType] || 'roadmap',
@@ -209,7 +209,10 @@
       streetViewControl: false,
       fullscreenControl: false,
       gestureHandling: 'greedy',
-    });
+    };
+    // Vector maps (which support setHeading / real map rotation) need a mapId.
+    if (cfg.mapId) mapOpts.mapId = cfg.mapId;
+    self._gmap = new (gm().Map)(self._el, mapOpts);
     self.getContainer = () => self._el;
     self.setView = (pos, zoom) => {
       self._gmap.setCenter(ll(pos));
@@ -244,6 +247,11 @@
     self.dragging = {
       enable: () => self._gmap.setOptions({ draggable: true }),
       disable: () => self._gmap.setOptions({ draggable: false }),
+    };
+    // Real map rotation (vector map only): heading = compass direction the top
+    // of the map faces. No-op on raster maps (no mapId).
+    self.setBearing = (deg) => {
+      if (self._gmap.setHeading) self._gmap.setHeading(((deg % 360) + 360) % 360);
     };
     self.on = () => self;
     window.__mapContainers.push(self._el);

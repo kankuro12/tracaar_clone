@@ -34,6 +34,9 @@ async function mapConfig() {
     mapType: process.env.GOOGLE_MAPS_MAP_TYPE || 'roadmap',
     language: process.env.GOOGLE_MAPS_LANGUAGE || 'en-US',
     region: process.env.GOOGLE_MAPS_REGION || 'NP',
+    // Vector map id — required for real map rotation (setHeading). Omitted when
+    // unset, in which case Google renders raster and rotation is a no-op.
+    mapId: process.env.GOOGLE_MAPS_MAP_ID || undefined,
     maxZoom: 22,
   };
 }

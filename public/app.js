@@ -51,18 +51,21 @@ function applyGeofenceVisibility() {
   }
 }
 
-// Heading-up mode: rotates the map container opposite the selected vehicle's
-// heading (cancels out with the marker's own heading rotation, so it points
-// straight up). Dragging is disabled while active — see vehicle-live.ejs.
+// Heading-up mode. On Google (vector map) this rotates the map itself via
+// setBearing so North tracks the vehicle's heading; Leaflet has no native
+// rotation, so it falls back to CSS-rotating the container (dragging is
+// disabled there since Leaflet's drag math doesn't know about the transform).
 function setMapRotation(active) {
-  if (!active) {
-    mapEl.style.transform = '';
-    if (mapZoomControls) mapZoomControls.style.transform = '';
-    map.dragging.enable();
+  if (active) {
+    if (map.setBearing) { map.setBearing(0); return; }
+    mapEl.style.transformOrigin = '50% 50%';
+    map.dragging.disable();
     return;
   }
-  mapEl.style.transformOrigin = '50% 50%';
-  map.dragging.disable();
+  if (map.setBearing) { map.setBearing(0); return; }
+  mapEl.style.transform = '';
+  if (mapZoomControls) mapZoomControls.style.transform = '';
+  map.dragging.enable();
 }
 
 document.getElementById('toggle-follow').checked = followVehicle;
@@ -414,8 +417,12 @@ function tickMotion() {
     }
     setRotation(id, a.headingDeg);
     if (rotateToHeading && isSoleSelected) {
-      mapEl.style.transform = `rotate(${-a.headingDeg}deg)`;
-      if (mapZoomControls) mapZoomControls.style.transform = `rotate(${a.headingDeg}deg)`;
+      if (map.setBearing) {
+        map.setBearing(a.headingDeg);
+      } else {
+        mapEl.style.transform = `rotate(${-a.headingDeg}deg)`;
+        if (mapZoomControls) mapZoomControls.style.transform = `rotate(${a.headingDeg}deg)`;
+      }
     }
   }
 }
