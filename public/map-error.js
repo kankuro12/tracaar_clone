@@ -3,7 +3,7 @@
    error, so a misconfigured provider never silently becomes a different map. */
 (function () {
   const chain = {};
-  ['addTo', 'remove', 'setLatLng', 'setIcon', 'bindPopup', 'openPopup', 'bindTooltip', 'on', 'setLatLngs'].forEach((m) => {
+  ['addTo', 'remove', 'setLatLng', 'setIcon', 'bindPopup', 'openPopup', 'bindTooltip', 'on', 'setLatLngs', 'setPopupContent', 'addLatLng'].forEach((m) => {
     chain[m] = () => chain;
   });
   chain.getElement = () => null;

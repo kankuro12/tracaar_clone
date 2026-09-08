@@ -94,10 +94,17 @@
     self.setIcon = (icon) => { ov.applyIcon(icon); return self; };
     self.getElement = () => ov._icon;
     self.bindPopup = (html) => { self._popup = html; return self; };
+    self.setPopupContent = (html) => {
+      self._popup = html;
+      // keep an already-open popup live rather than waiting for the next click
+      if (sharedInfo && sharedInfo.getMap() && sharedInfo.get('owner') === self) sharedInfo.setContent(html);
+      return self;
+    };
     self.openPopup = () => {
       if (!self._popup || !self._map) return self;
       info().setContent(self._popup);
       info().setPosition(ov._pos);
+      info().set('owner', self);
       info().open(self._map._gmap);
       return self;
     };
@@ -131,14 +138,36 @@
     return self;
   }
 
+  // Leaflet dashed .trail via CSS stroke-dasharray; a canvas polyline needs a
+  // repeating symbol instead. Keyed by className to mirror style.css.
+  const DASH = { trail: [6, 6] };
+
+  function dashed(style, className) {
+    const d = DASH[className];
+    if (!d) return style;
+    const s = Object.assign({}, style, { strokeOpacity: 0 });
+    s.icons = [{
+      icon: { path: `M 0,0 0,${d[0]}`, strokeColor: style.strokeColor, strokeOpacity: style.strokeOpacity, strokeWeight: style.strokeWeight },
+      offset: '0',
+      repeat: `${d[0] + d[1]}px`,
+    }];
+    return s;
+  }
+
   function Polyline(pts, opts) {
+    opts = opts || {};
     const path = (pts || []).map(ll);
-    const shape = new (gm().Polyline)(Object.assign({ path }, vectorStyle(opts)));
+    const shape = new (gm().Polyline)(Object.assign({ path }, dashed(vectorStyle(opts), opts.className)));
     const self = wrap(shape);
     self.getLatLngs = () => path;
     self.setLatLngs = (next) => {
       path.length = 0;
       (next || []).map(ll).forEach((p) => path.push(p));
+      shape.setPath(path);
+      return self;
+    };
+    self.addLatLng = (p) => {
+      path.push(ll(p));
       shape.setPath(path);
       return self;
     };
