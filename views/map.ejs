@@ -33,6 +33,21 @@
           </div>
         </div>
 
+        <!-- Private saved routes: load overlays on the fleet map; adding the
+             current fix needs exactly one selected vehicle. -->
+        <div class="d-flex flex-column gap-2 mb-2 p-2 border rounded-2" id="saved-route-controls" style="border-color: var(--border) !important;">
+          <h6 class="text-uppercase text-body-secondary fw-bold mb-0 font-monospace" style="font-size: 10px; letter-spacing: 0.05em;">Saved route</h6>
+          <select id="route-select" class="form-select form-select-sm" aria-label="Saved route">
+            <option value="">Select a private route…</option>
+          </select>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-primary flex-grow-1" id="route-add">Add current fix</button>
+            <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="route-load">Load</button>
+            <button class="btn btn-sm btn-outline-secondary" id="route-clear">Clear</button>
+          </div>
+          <div class="small text-body-secondary" id="route-status">Routes stay private to this login.</div>
+        </div>
+
         <button class="btn btn-sm btn-outline-secondary w-100 py-2 d-flex align-items-center justify-content-center gap-2 font-medium" id="show-all">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
           Show all vehicles
@@ -52,6 +67,7 @@
   <script>window.FLEET = { user: <%- JSON.stringify(user) %>, token: <%- JSON.stringify(token) %>, liveMapPrefs: <%- JSON.stringify(liveMapPrefs) %> };</script>
   <%- include('partials/scripts') %>
   <%- include('partials/map-lib') %>
+  <script src="/saved-routes.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

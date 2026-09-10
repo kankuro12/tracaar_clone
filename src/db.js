@@ -244,6 +244,65 @@ async function listTrashedVehicles(customerId) {
   return r.rows;
 }
 
+const USER_ROUTE_COLS = 'id, user_id, customer_id, name, points, created_at, updated_at';
+
+async function listUserRoutes(userId) {
+  const r = await pool.query(
+    `SELECT ${USER_ROUTE_COLS} FROM user_routes WHERE user_id = $1 ORDER BY updated_at DESC`,
+    [userId]
+  );
+  return r.rows;
+}
+
+async function getUserRoute(userId, id) {
+  const r = await pool.query(
+    `SELECT ${USER_ROUTE_COLS} FROM user_routes WHERE id = $1 AND user_id = $2`,
+    [id, userId]
+  );
+  return r.rows[0] || null;
+}
+
+async function createUserRoute(userId, customerId, name, points) {
+  const r = await pool.query(
+    `INSERT INTO user_routes (user_id, customer_id, name, points)
+     VALUES ($1, $2, $3, $4::jsonb)
+     RETURNING ${USER_ROUTE_COLS}`,
+    [userId, customerId, name, JSON.stringify(points || [])]
+  );
+  return r.rows[0];
+}
+
+async function updateUserRoute(userId, id, { name, points }) {
+  const sets = [];
+  const params = [id, userId];
+  let i = 3;
+  if (name !== undefined) { sets.push(`name = $${i++}`); params.push(name); }
+  if (points !== undefined) { sets.push(`points = $${i++}::jsonb`); params.push(JSON.stringify(points)); }
+  if (!sets.length) return getUserRoute(userId, id);
+  sets.push('updated_at = now()');
+  const r = await pool.query(
+    `UPDATE user_routes SET ${sets.join(', ')} WHERE id = $1 AND user_id = $2 RETURNING ${USER_ROUTE_COLS}`,
+    params
+  );
+  return r.rows[0] || null;
+}
+
+async function deleteUserRoute(userId, id) {
+  const r = await pool.query('DELETE FROM user_routes WHERE id = $1 AND user_id = $2 RETURNING id', [id, userId]);
+  return r.rows[0] || null;
+}
+
+async function appendUserRoutePoint(userId, id, point) {
+  const r = await pool.query(
+    `UPDATE user_routes
+     SET points = points || $3::jsonb, updated_at = now()
+     WHERE id = $1 AND user_id = $2
+     RETURNING ${USER_ROUTE_COLS}`,
+    [id, userId, JSON.stringify([point])]
+  );
+  return r.rows[0] || null;
+}
+
 async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
   const rows = await positionHistory(user, vehicleId, from, to);
   if (rows === null) return null;
@@ -252,4 +311,4 @@ async function tripPlayback(user, vehicleId, from, to, maxPoints = 2000) {
   return pts.filter((_, i) => i % step === 0);
 }
 
-module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback, vehicleLimitReached, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, getLiveMapPrefs, setLiveMapPrefs };
+module.exports = { pool, getVehicleByImei, invalidateVehicleCache, insertPosition, visibleVehicleIds, canSeeVehicle, latestPositions, positionHistory, resolveOfflineAlert, createAlert, recordBlockedImei, listBlockedImeis, clearBlockedImei, auditLog, reportSummary, tripPlayback, vehicleLimitReached, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, getLiveMapPrefs, setLiveMapPrefs, listUserRoutes, getUserRoute, createUserRoute, updateUserRoute, deleteUserRoute, appendUserRoutePoint };

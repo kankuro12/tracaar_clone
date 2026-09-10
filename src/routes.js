@@ -2,7 +2,7 @@ const { Router } = require('express');
 const bcrypt = require('bcryptjs');
 const { pool } = require('./db');
 const { sign, signSessionToken, verify, sha256, randomKey, auth, requireRole, weakPassword, MIN_PASSWORD_LEN } = require('./auth');
-const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached, visibleVehicleIds, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, setLiveMapPrefs } = require('./db');
+const { latestPositions, positionHistory, canSeeVehicle, invalidateVehicleCache, listBlockedImeis, clearBlockedImei, reportSummary, tripPlayback, auditLog, vehicleLimitReached, visibleVehicleIds, trashVehicle, restoreVehicle, setVehicleDashboardHidden, listTrashedVehicles, setLiveMapPrefs, listUserRoutes, getUserRoute, createUserRoute, updateUserRoute, deleteUserRoute, appendUserRoutePoint } = require('./db');
 const { rateLimit } = require('./ratelimit');
 const { invalidateRules } = require('./rules');
 const { recordPayment, changePlanProrated, revenueSummary, previewInvoice } = require('./billing');
@@ -307,6 +307,101 @@ router.patch('/vehicles/:id/hidden', auth, requireRole('admin'), async (req, res
   if (!v) return;
   await setVehicleDashboardHidden(req.user.customerId, v.id, req.body && req.body.hidden);
   res.status(204).end();
+});
+
+// ---- Private saved routes (per user) ----
+// ponytail: ordered JSONB stops, not a GIS path — full navigation needs Directions/OSRM, add when asked
+const MAX_SAVED_ROUTE_POINTS = 200;
+
+function cleanRouteName(name) {
+  const n = String(name || '').trim();
+  if (!n || n.length > 80) throw new Error('name required, max 80 chars');
+  return n;
+}
+
+function cleanRoutePoint(p) {
+  const lat = Number(p && (p.lat ?? p[0]));
+  const lon = Number(p && (p.lon ?? p[1]));
+  if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
+    throw new Error('each point needs a valid lat/lon');
+  }
+  return { lat, lon, label: p && p.label != null ? String(p.label).trim().slice(0, 80) : '' };
+}
+
+function cleanRoutePoints(points) {
+  if (points === undefined) return undefined;
+  if (!Array.isArray(points) || points.length > MAX_SAVED_ROUTE_POINTS) {
+    throw new Error(`points: array, max ${MAX_SAVED_ROUTE_POINTS}`);
+  }
+  return points.map(cleanRoutePoint);
+}
+
+function userRouteShape(row) {
+  return { id: String(row.id), name: row.name, points: Array.isArray(row.points) ? row.points : [], updatedAt: row.updated_at };
+}
+
+router.post('/user/routes', auth, requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const row = await createUserRoute(req.user.id, req.user.customerId, cleanRouteName(req.body && req.body.name), cleanRoutePoints(req.body && req.body.points) || []);
+    res.status(201).json(userRouteShape(row));
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'route name already exists' });
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+router.get('/user/routes', auth, requireRole('admin', 'user'), async (req, res) => {
+  res.json((await listUserRoutes(req.user.id)).map(userRouteShape));
+});
+
+router.get('/user/routes/:id', auth, requireRole('admin', 'user'), async (req, res) => {
+  const row = await getUserRoute(req.user.id, req.params.id);
+  if (!row) return res.status(404).json({ error: 'route not found' });
+  res.json(userRouteShape(row));
+});
+
+router.patch('/user/routes/:id', auth, requireRole('admin', 'user'), async (req, res) => {
+  try {
+    const patch = {};
+    if (req.body && req.body.name !== undefined) patch.name = cleanRouteName(req.body.name);
+    if (req.body && req.body.points !== undefined) patch.points = cleanRoutePoints(req.body.points);
+    const row = await updateUserRoute(req.user.id, req.params.id, patch);
+    if (!row) return res.status(404).json({ error: 'route not found' });
+    res.json(userRouteShape(row));
+  } catch (e) {
+    if (e.code === '23505') return res.status(409).json({ error: 'route name already exists' });
+    return res.status(400).json({ error: e.message });
+  }
+});
+
+router.delete('/user/routes/:id', auth, requireRole('admin', 'user'), async (req, res) => {
+  const row = await deleteUserRoute(req.user.id, req.params.id);
+  if (!row) return res.status(404).json({ error: 'route not found' });
+  res.status(204).end();
+});
+
+router.post('/user/routes/:id/points', auth, requireRole('admin', 'user'), async (req, res) => {
+  const route = await getUserRoute(req.user.id, req.params.id);
+  if (!route) return res.status(404).json({ error: 'route not found' });
+  const vehicleId = Number(req.body && req.body.vehicleId);
+  if (!Number.isInteger(vehicleId)) return res.status(400).json({ error: 'vehicleId required' });
+  if (!(await canSeeVehicle(req.user, vehicleId))) return res.status(403).json({ error: 'not allowed to see this vehicle' });
+  if ((route.points || []).length >= MAX_SAVED_ROUTE_POINTS) return res.status(409).json({ error: 'route is full' });
+  const pos = await pool.query(
+    `SELECT p.lat, p.lon, p.recorded_at, p.device_time, p.speed_kn, p.course
+     FROM positions p JOIN vehicles v ON v.id = p.vehicle_id
+     WHERE p.vehicle_id = $1 AND p.valid AND v.deleted_at IS NULL
+     ORDER BY p.device_time DESC LIMIT 1`,
+    [vehicleId]
+  );
+  if (!pos.rows.length) return res.status(409).json({ error: 'no current fix' });
+  const f = pos.rows[0];
+  const updated = await appendUserRoutePoint(req.user.id, route.id, {
+    lat: +f.lat, lon: +f.lon, label: '', vehicleId,
+    recordedAt: f.recorded_at, deviceTime: f.device_time, speedKn: +f.speed_kn, course: +f.course,
+  });
+  if (!updated) return res.status(404).json({ error: 'route not found' });
+  res.status(201).json(userRouteShape(updated));
 });
 
 // ---- Geofences ----
@@ -981,3 +1076,6 @@ router.delete('/blocked-imeis', auth, requireRole('super_admin'), async (req, re
 });
 
 module.exports = router;
+module.exports.cleanRouteName = cleanRouteName;
+module.exports.cleanRoutePoint = cleanRoutePoint;
+module.exports.cleanRoutePoints = cleanRoutePoints;

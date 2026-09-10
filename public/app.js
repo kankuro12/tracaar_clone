@@ -84,6 +84,58 @@ function pauseFollow() {
 }
 map.on('dragstart', pauseFollow);
 
+let savedRouteLayer = { line: null, stops: [] };
+function routeStatus(msg) {
+  const el = document.getElementById('route-status');
+  if (el) el.textContent = msg;
+}
+function selectedRouteId() {
+  const el = document.getElementById('route-select');
+  return el ? String(el.value || '') : '';
+}
+async function refreshRouteOptions(selected = '') {
+  const sel = document.getElementById('route-select');
+  if (!sel) return;
+  try {
+    const routes = await SavedRoutes.list();
+    sel.innerHTML = '<option value="">Select a private route…</option>' + routes.map((r) => {
+      const count = Array.isArray(r.points) ? r.points.length : 0;
+      const name = String(r.name).replace(/</g, '&lt;');
+      return `<option value="${r.id}"${String(r.id) === String(selected) ? ' selected' : ''}>${name} (${count})</option>`;
+    }).join('');
+  } catch (e) { routeStatus('Could not load saved routes.'); }
+}
+async function handleRouteLoad() {
+  const id = selectedRouteId();
+  if (!id) { routeStatus('Select a route first.'); return; }
+  try {
+    const route = await SavedRoutes.get(id);
+    savedRouteLayer = SavedRoutes.clearLayer(savedRouteLayer);
+    savedRouteLayer = SavedRoutes.draw(map, route.points, { fit: true });
+    routeStatus(`${route.name}: ${route.points.length} stops loaded.`);
+  } catch (e) { routeStatus(e.message); }
+}
+async function handleRouteAddFix() {
+  if (state.selected.size !== 1) { routeStatus('Select exactly one vehicle to add its current fix.'); return; }
+  const id = selectedRouteId();
+  if (!id) { routeStatus('Select a route first.'); return; }
+  try {
+    const [vehicleId] = state.selected;
+    const route = await SavedRoutes.appendFix(id, vehicleId);
+    await refreshRouteOptions(route.id);
+    savedRouteLayer = SavedRoutes.clearLayer(savedRouteLayer);
+    savedRouteLayer = SavedRoutes.draw(map, route.points, { fit: false });
+    routeStatus(`Added current fix as stop ${route.points.length}.`);
+  } catch (e) { routeStatus(e.message); }
+}
+document.getElementById('route-load').addEventListener('click', handleRouteLoad);
+document.getElementById('route-add').addEventListener('click', handleRouteAddFix);
+document.getElementById('route-clear').addEventListener('click', () => {
+  savedRouteLayer = SavedRoutes.clearLayer(savedRouteLayer);
+  routeStatus('Cleared route overlay.');
+});
+refreshRouteOptions();
+
 document.getElementById('toggle-follow').addEventListener('change', (e) => {
   followVehicle = e.target.checked;
   saveControls();
@@ -204,6 +256,8 @@ function applySelection() {
     mapControlsPanel.classList.add('d-none');
     setMapRotation(false);
   }
+  const addCurrent = document.getElementById('route-add');
+  if (addCurrent) addCurrent.disabled = state.selected.size !== 1;
   for (const v of state.vehicles.values()) {
     setMarkerIcon(v.id);
   }

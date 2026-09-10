@@ -127,6 +127,20 @@
         </div>
       </div>
 
+      <!-- Saved Route Card -->
+      <div class="telemetry-card mb-3">
+        <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Saved route</div>
+        <select id="route-select" class="form-select form-select-sm mb-2" aria-label="Saved route">
+          <option value="">Select a private route…</option>
+        </select>
+        <div class="d-flex gap-2">
+          <button class="btn btn-sm btn-outline-primary flex-grow-1" id="route-add-fix">Add current fix</button>
+          <button class="btn btn-sm btn-outline-secondary flex-grow-1" id="route-load">Load</button>
+          <button class="btn btn-sm btn-outline-secondary" id="route-clear">Clear</button>
+        </div>
+        <div class="small text-body-secondary mt-2" id="route-status">Routes stay private to this login.</div>
+      </div>
+
       <!-- Live Telemetry Fixes Log -->
       <div class="flex-grow-1 d-flex flex-column">
         <div class="text-uppercase text-body-secondary small font-monospace fw-bold mb-2">Live Fix Log</div>
@@ -159,6 +173,7 @@
   </script>
   <%- include('partials/scripts') %>
   <%- include('partials/map-lib') %>
+  <script src="/saved-routes.js"></script>
   <script>
     /* Single vehicle live tracking client */
     const ONLINE_MS = 3 * 60 * 1000;
@@ -233,6 +248,56 @@
       saveControls();
     }
     map.on('dragstart', pauseFollow);
+
+    let routeLayer = { line: null, stops: [] };
+    function routeStatus(msg) {
+      const el = document.getElementById('route-status');
+      if (el) el.textContent = msg;
+    }
+    function selectedRouteId() {
+      const el = document.getElementById('route-select');
+      return el ? String(el.value || '') : '';
+    }
+    async function refreshRouteOptions(selected = '') {
+      const sel = document.getElementById('route-select');
+      if (!sel) return;
+      try {
+        const routes = await SavedRoutes.list();
+        sel.innerHTML = '<option value="">Select a private route…</option>' + routes.map((r) => {
+          const count = Array.isArray(r.points) ? r.points.length : 0;
+          const name = String(r.name).replace(/</g, '&lt;');
+          return `<option value="${r.id}"${String(r.id) === String(selected) ? ' selected' : ''}>${name} (${count})</option>`;
+        }).join('');
+      } catch (e) { routeStatus('Could not load saved routes.'); }
+    }
+    async function handleRouteLoad() {
+      const id = selectedRouteId();
+      if (!id) { routeStatus('Select a route first.'); return; }
+      try {
+        const route = await SavedRoutes.get(id);
+        routeLayer = SavedRoutes.clearLayer(routeLayer);
+        routeLayer = SavedRoutes.draw(map, route.points, { fit: true });
+        routeStatus(`${route.name}: ${route.points.length} stops loaded.`);
+      } catch (e) { routeStatus(e.message); }
+    }
+    async function handleRouteAddFix() {
+      const id = selectedRouteId();
+      if (!id) { routeStatus('Select a route first.'); return; }
+      try {
+        const route = await SavedRoutes.appendFix(id, vehicle.id);
+        await refreshRouteOptions(route.id);
+        routeLayer = SavedRoutes.clearLayer(routeLayer);
+        routeLayer = SavedRoutes.draw(map, route.points, { fit: false });
+        routeStatus(`Added current fix as stop ${route.points.length}.`);
+      } catch (e) { routeStatus(e.message); }
+    }
+    document.getElementById('route-load').addEventListener('click', handleRouteLoad);
+    document.getElementById('route-add-fix').addEventListener('click', handleRouteAddFix);
+    document.getElementById('route-clear').addEventListener('click', () => {
+      routeLayer = SavedRoutes.clearLayer(routeLayer);
+      routeStatus('Cleared route overlay.');
+    });
+    refreshRouteOptions();
 
     const kmh = (kn) => Math.round((kn || 0) * 1.852);
     const fmt = (n) => (n != null ? Number(n).toFixed(6) : '—');

@@ -3,7 +3,7 @@
 // the session cookie, so page forms just fetch /api with no token handling.
 const { Router } = require('express');
 const bcrypt = require('bcryptjs');
-const { pool, latestPositions, canSeeVehicle, getLiveMapPrefs } = require('./db');
+const { pool, latestPositions, canSeeVehicle, getLiveMapPrefs, listUserRoutes } = require('./db');
 const { sign } = require('./auth');
 const { rateLimit } = require('./ratelimit');
 const { revenueSummary } = require('./billing');
@@ -32,6 +32,7 @@ const NAV = {
     ['/portal', 'Overview'],
     ['/app', 'Live map'],
     ['/portal/trips', 'Trips'],
+    ['/portal/routes', 'Routes'],
     ['/portal/alerts', 'Alerts'],
     ['/portal/reports', 'Reports'],
     ['/admin/vehicles', 'Vehicles'],
@@ -46,6 +47,7 @@ const NAV = {
     ['/portal', 'Overview'],
     ['/app', 'Live map'],
     ['/portal/trips', 'Trips'],
+    ['/portal/routes', 'Routes'],
     ['/portal/alerts', 'Alerts'],
     ['/portal/reports', 'Reports'],
     ['/portal/billing', 'Billing'],
@@ -153,6 +155,10 @@ router.get('/portal', loadUser, rolePage('admin', 'user'), async (req, res) => {
 router.get('/portal/trips', loadUser, rolePage('admin', 'user'), async (req, res) => {
   const vehicles = await _latest(req.user);
   res.render('portal-trips', { vehicles, active: 'portal/trips', token: req.session.token });
+});
+router.get('/portal/routes', loadUser, rolePage('admin', 'user'), async (req, res) => {
+  const routes = await listUserRoutes(req.user.id);
+  res.render('portal-routes', { routes, active: '/portal/routes', token: req.session.token });
 });
 router.get('/portal/alerts', loadUser, rolePage('admin', 'user'), async (req, res) => {
   const q = pageQuery(req);

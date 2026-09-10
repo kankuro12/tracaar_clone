@@ -21,6 +21,19 @@ CREATE TABLE IF NOT EXISTS users (
 ALTER TABLE users
   ADD COLUMN IF NOT EXISTS live_map_prefs JSONB;
 
+-- Private per-user saved routes (ordered stops); mirrored in migration 009.
+CREATE TABLE IF NOT EXISTS user_routes (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  name        TEXT NOT NULL,
+  points      JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_user_routes_user_name ON user_routes (user_id, lower(name));
+CREATE INDEX IF NOT EXISTS idx_user_routes_user ON user_routes (user_id);
+
 CREATE TABLE IF NOT EXISTS vehicles (
   id          BIGSERIAL PRIMARY KEY,
   customer_id BIGINT NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
